@@ -1,5 +1,18 @@
 services:
 
+  milestone_core:
+    build:
+      dockerfile: Dockerfile
+      context: .
+    ports:
+      - "80:3333"
+    depends_on:
+      - milestone_flow_db
+    env_file:
+      - .env
+    networks:
+      - common-net
+
   milestone_flow_db:
     image: mongo
     restart: always
@@ -11,3 +24,8 @@ services:
     volumes:
       - ./db_data/flow_db:/data/db
       - ./scripts/flow-db-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro
+    networks:
+      - common-net
+
+networks:
+  common-net: { }

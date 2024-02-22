@@ -34,6 +34,7 @@ func (rs FlowsResource) Routes() chi.Router {
 		r.Post("/{stepId}/start", rs.StartStep)
 		r.Post("/{stepId}/complete", rs.CompleteStep)
 		r.Put("/{stepId}/data", rs.UpdateStepData)
+		r.Post("/capture", rs.Capture)
 	})
 
 	return r
@@ -111,8 +112,9 @@ func (rs FlowsResource) StartStep(w http.ResponseWriter, r *http.Request) {
 func (rs FlowsResource) CompleteStep(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	idStep := chi.URLParam(r, "stepId")
+	segmentId := r.URL.Query().Get("segmentId")
 
-	step, err := rs.ProgressService.CompleteStep(idParam, idStep, "1", uint32(time.Now().Unix()))
+	step, err := rs.ProgressService.CompleteStep(idParam, idStep, "1", uint32(time.Now().Unix()), segmentId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -140,4 +142,23 @@ func (rs FlowsResource) UpdateStepData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	server.SendJson(w, "updated flow with id: "+flowId)
+}
+
+func (rs FlowsResource) Capture(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+
+	var updateInput flow.UpdateInput
+	err := json.NewDecoder(r.Body).Decode(&updateInput)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	err = rs.FlowService.Capture(idParam, updateInput.NewSteps)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, "updated flow with id: "+idParam)
 }

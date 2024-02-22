@@ -6,6 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"milestone_core/flow"
+	"strings"
 )
 
 type Service struct {
@@ -59,6 +60,32 @@ func (s Service) CreateFromTemplate(id string, override flow.Flow) (interface{},
 	if len(override.BaseURL) > 0 {
 		flowTemplate.BaseURL = override.BaseURL
 	}
+	if len(override.Segments) > 0 {
+		flowTemplate.Segments = make([]flow.Segment, 0)
+		for _, segment := range override.Segments {
+			flowTemplate.Segments = append(flowTemplate.Segments, flow.Segment{
+				SegmentID: strings.ReplaceAll(strings.ToLower(segment.Name), " ", "_"),
+				Name:      segment.Name,
+			})
+		}
+
+		flowTemplate.Steps = flowTemplate.Steps[:1]
+		for _, segment := range flowTemplate.Segments {
+			flowTemplate.Steps = append(flowTemplate.Steps, flow.Step{
+				ParentNodeId: flowTemplate.Steps[0].StepID,
+				StepID:       segment.SegmentID,
+				Data: flow.StepData{
+					Name: segment.Name + " Step 1",
+				},
+				Opts: flow.StepOpts{
+					SegmentID: segment.SegmentID,
+					IsFinal:   true,
+				},
+			})
+		}
+
+		s.updateStepsRelations(flowTemplate)
+	}
 
 	flowTemplate.ID = primitive.NilObjectID
 	result, err := s.FlowCollection.InsertOne(context.Background(), flowTemplate)
@@ -67,4 +94,42 @@ func (s Service) CreateFromTemplate(id string, override flow.Flow) (interface{},
 	}
 
 	return result.InsertedID, nil
+}
+
+func (s Service) updateStepsRelations(template *flow.Flow) {
+	adjList := make(map[string][]*flow.Step)
+	var sourceStep *flow.Step
+
+	for i := range template.Steps {
+		if 0 == len(template.Steps[i].ParentNodeId) {
+			template.Steps[i].Opts.IsSource = true
+			sourceStep = &template.Steps[i]
+			continue
+		}
+		adjList[template.Steps[i].ParentNodeId] = append(adjList[template.Steps[i].ParentNodeId], &template.Steps[i])
+	}
+
+	relations := make([]flow.Relation, 0, len(template.Steps)-1)
+
+	q := make([]*flow.Step, 0)
+	q = append(q, sourceStep)
+	for len(q) > 0 {
+		node := q[0]
+		q = q[1:]
+		if children, ok := adjList[node.StepID]; ok {
+			node.Opts.IsFinal = false
+			for _, child := range children {
+				q = append(q, child)
+				relations = append(relations, flow.Relation{From: node.StepID, To: child.StepID})
+
+				if len(node.Opts.SegmentID) > 0 {
+					child.Opts.SegmentID = node.Opts.SegmentID
+				}
+			}
+		} else {
+			node.Opts.IsFinal = true
+		}
+	}
+
+	template.Relations = relations
 }

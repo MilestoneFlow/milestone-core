@@ -9,21 +9,30 @@ import (
 	"milestone_core/flow"
 	"milestone_core/progress"
 	"milestone_core/template"
+	"milestone_core/users"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
+	log.Default().Print("a mers")
+
 	flowDbConnection := getFlowDbConnection()
+	log.Default().Print("a mers si db")
+
 	flowCollection := flowDbConnection.Collection("flows")
 	progressCollection := flowDbConnection.Collection("flows_progress")
 	templateCollection := flowDbConnection.Collection("flows_templates")
+	usersCollection := flowDbConnection.Collection("enrolled_users")
+	log.Default().Print("a mers si colectii")
 
 	flowService := flow.Service{Collection: flowCollection}
 	progressService := progress.Service{Collection: progressCollection, FlowService: flowService}
 	templateService := template.Service{Collection: templateCollection, FlowCollection: flowCollection}
+	usersService := users.Service{Collection: usersCollection}
 
 	r := chi.NewRouter()
 
@@ -44,7 +53,7 @@ func main() {
 		w.Write([]byte("."))
 	})
 
-	r.Mount("/users", usersResource{FlowDb: flowDbConnection}.Routes())
+	r.Mount("/enrolled-users", usersResource{usersService: usersService}.Routes())
 	r.Mount("/todos", todosResource{}.Routes())
 	r.Mount("/flows", FlowsResource{
 		FlowService:     flowService,
@@ -58,8 +67,8 @@ func main() {
 }
 
 func getFlowDbConnection() mongo.Database {
-	mongoURI := "mongodb://flowAdmin:milestoneFlow123@localhost:27017"
-	dbName := "flowDb"
+	mongoURI := os.Getenv("FLOW_DB_CONNECTION_URL")
+	dbName := os.Getenv("FLOW_DB_NAME")
 
 	// Set client options
 	clientOptions := options.Client().ApplyURI(mongoURI)

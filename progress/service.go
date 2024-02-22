@@ -75,7 +75,7 @@ func (s Service) MoveToNextStep(flowId string, userId string, completionDate int
 		EffectiveAt: primitive.Timestamp{T: uint32(completionDate)},
 	})
 
-	nextStep, err := s.FlowService.GetChildrenStep(flowId, currentProgress.StepId)
+	nextStep, err := s.FlowService.GetChildrenStep(flowId, currentProgress.StepId, "")
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +135,8 @@ func (s Service) StartStep(flowId string, stepId string, userId string, timestam
 	return nextStep, nil
 }
 
-func (s Service) CompleteStep(flowId string, stepId string, userId string, timestamp uint32) (*flow.Step, error) {
-	nextStep, err := s.FlowService.GetChildrenStep(flowId, stepId)
+func (s Service) CompleteStep(flowId string, stepId string, userId string, timestamp uint32, segmentId string) (*flow.Step, error) {
+	nextStep, err := s.FlowService.GetChildrenStep(flowId, stepId, segmentId)
 	if err != nil {
 		return nil, err
 	}

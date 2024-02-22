@@ -29,14 +29,29 @@ func (s Service) Get(id string) (*Flow, error) {
 	return &flow, nil
 }
 
-func (s Service) GetChildrenStep(flowId string, parentStepId string) (*Step, error) {
+func (s Service) GetChildrenStep(flowId string, parentStepId string, segmentId string) (*Step, error) {
 	flow, err := s.Get(flowId)
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range flow.Steps {
-		if flow.Steps[i].ParentNodeId == parentStepId {
+		if flow.Steps[i].ParentNodeId == parentStepId && (len(segmentId) == 0 || flow.Steps[i].Opts.SegmentID == segmentId) {
+			return &flow.Steps[i], nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (s Service) GetStep(flowId string, stepId string) (*Step, error) {
+	flow, err := s.Get(flowId)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range flow.Steps {
+		if flow.Steps[i].StepID == stepId {
 			return &flow.Steps[i], nil
 		}
 	}
@@ -90,11 +105,54 @@ func (s Service) Update(id string, updateInput UpdateInput) error {
 		flow.Name = *updateInput.Name
 	}
 
+	if nil != updateInput.BaseURL {
+		flow.BaseURL = *updateInput.BaseURL
+	}
+
+	for _, deletedStep := range updateInput.DeletedSteps {
+		for i := range flow.Steps {
+			if flow.Steps[i].StepID == deletedStep {
+				prevId := flow.Steps[i].ParentNodeId
+				nextId := ""
+				for _, step := range flow.Steps {
+					if step.ParentNodeId == deletedStep {
+						nextId = step.StepID
+						break
+					}
+				}
+
+				if len(nextId) > 0 {
+					for i := range flow.Steps {
+						if flow.Steps[i].StepID == nextId {
+							flow.Steps[i].ParentNodeId = prevId
+							break
+						}
+					}
+				}
+
+				flow.Steps = append(flow.Steps[:i], flow.Steps[i+1:]...)
+
+				break
+			}
+		}
+	}
+
 	for _, updatedStep := range updateInput.UpdatedSteps {
 		s.updateStepData(flow, &updatedStep)
 	}
 
 	s.updateStepsRelations(flow)
+
+	for _, updatedSegment := range updateInput.Segments {
+		if len(updatedSegment.Name) > 0 {
+			for i := range flow.Segments {
+				if flow.Segments[i].SegmentID == updatedSegment.SegmentID {
+					flow.Segments[i].Name = updatedSegment.Name
+					break
+				}
+			}
+		}
+	}
 
 	flowIndented, _ := json.MarshalIndent(flow, "", "\t")
 	log.Default().Print(string(flowIndented))
@@ -124,13 +182,33 @@ func (s Service) UpdateStepData(id string, idStep string, updateStepDataInput St
 	return err
 }
 
+func (s Service) Capture(id string, newSteps []Step) error {
+	flow, err := s.Get(id)
+	if err != nil {
+		return err
+	}
+
+	flow.Steps = newSteps
+	flow.Segments = make([]Segment, 0)
+	s.updateStepsRelations(flow)
+
+	err = s.saveUpdatedFlow(flow)
+
+	return err
+}
+
 func (s Service) updateStepData(flow *Flow, updatedStep *Step) {
 	for i := range flow.Steps {
 		if flow.Steps[i].StepID == updatedStep.StepID {
 			flow.Steps[i].Data = updatedStep.Data
+			if len(updatedStep.ParentNodeId) > 0 && flow.Steps[i].ParentNodeId != updatedStep.ParentNodeId {
+				flow.Steps[i].ParentNodeId = updatedStep.ParentNodeId
+			}
+
 			return
 		}
 	}
+
 	flow.Steps = append(flow.Steps, Step{
 		StepID:       updatedStep.StepID,
 		ParentNodeId: updatedStep.ParentNodeId,
@@ -140,6 +218,12 @@ func (s Service) updateStepData(flow *Flow, updatedStep *Step) {
 			TargetUrl:          updatedStep.Data.TargetUrl,
 			AssignedCssElement: updatedStep.Data.AssignedCssElement,
 			ElementType:        updatedStep.Data.ElementType,
+			Placement:          updatedStep.Data.Placement,
+			ElementTemplate:    updatedStep.Data.ElementTemplate,
+		},
+		Opts: StepOpts{
+			SegmentID:  updatedStep.Opts.SegmentID,
+			Transition: updatedStep.Opts.Transition,
 		},
 	})
 }
@@ -151,28 +235,37 @@ func (s Service) saveUpdatedFlow(flow *Flow) error {
 }
 
 func (s Service) updateStepsRelations(flow *Flow) {
-	adjList := make(map[string][]string)
-
-	for _, step := range flow.Steps {
-		if 0 == len(step.ParentNodeId) {
-			continue
-		}
-		adjList[step.ParentNodeId] = append(adjList[step.ParentNodeId], step.StepID)
-	}
-
-	noOfRelations := len(flow.Steps) - 1
-	relations := make([]Relation, 0, noOfRelations)
-	for parentNodeId, childrenNodes := range adjList {
-		for _, childrenNodeId := range childrenNodes {
-			relations = append(relations, Relation{From: parentNodeId, To: childrenNodeId})
-		}
-	}
+	adjList := make(map[string][]*Step)
+	var sourceStep *Step
 
 	for i := range flow.Steps {
-		if _, ok := adjList[flow.Steps[i].StepID]; ok {
-			flow.Steps[i].Opts.IsFinal = false
+		if 0 == len(flow.Steps[i].ParentNodeId) {
+			flow.Steps[i].Opts.IsSource = true
+			sourceStep = &flow.Steps[i]
+			continue
+		}
+		adjList[flow.Steps[i].ParentNodeId] = append(adjList[flow.Steps[i].ParentNodeId], &flow.Steps[i])
+	}
+
+	relations := make([]Relation, 0, len(flow.Steps)-1)
+
+	q := make([]*Step, 0)
+	q = append(q, sourceStep)
+	for len(q) > 0 {
+		node := q[0]
+		q = q[1:]
+		if children, ok := adjList[node.StepID]; ok {
+			node.Opts.IsFinal = false
+			for _, child := range children {
+				q = append(q, child)
+				relations = append(relations, Relation{From: node.StepID, To: child.StepID})
+
+				if len(node.Opts.SegmentID) > 0 && len(child.Opts.SegmentID) == 0 {
+					child.Opts.SegmentID = node.Opts.SegmentID
+				}
+			}
 		} else {
-			flow.Steps[i].Opts.IsFinal = true
+			node.Opts.IsFinal = true
 		}
 	}
 

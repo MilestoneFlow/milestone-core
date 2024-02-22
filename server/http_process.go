@@ -20,7 +20,7 @@ func SendJson(writer http.ResponseWriter, data any) {
 		log.Fatal(err)
 		return
 	}
-
+	
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("Content-Type", "application/json")
 	_, err = writer.Write(jsonData)
