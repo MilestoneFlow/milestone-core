@@ -6,6 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
+	"milestone_core/authorization"
 	"milestone_core/flow"
 	"milestone_core/progress"
 	"milestone_core/template"
@@ -27,19 +28,17 @@ func main() {
 	progressCollection := flowDbConnection.Collection("flows_progress")
 	templateCollection := flowDbConnection.Collection("flows_templates")
 	usersCollection := flowDbConnection.Collection("enrolled_users")
+	branchingCollection := flowDbConnection.Collection("branching")
+
 	log.Default().Print("a mers si colectii")
 
 	flowService := flow.Service{Collection: flowCollection}
 	progressService := progress.Service{Collection: progressCollection, FlowService: flowService}
 	templateService := template.Service{Collection: templateCollection, FlowCollection: flowCollection}
 	usersService := users.Service{Collection: usersCollection}
+	branchingService := flow.BranchingService{Collection: branchingCollection}
 
 	r := chi.NewRouter()
-
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
 	corsMiddleware := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, // Adjust this based on your specific requirements
 		AllowedMethods: []string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -48,6 +47,12 @@ func main() {
 	})
 
 	r.Use(corsMiddleware.Handler)
+	r.Use(authorization.CognitoMiddleware("us-east-1_zrIqQshjP", "us-east-1"))
+
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("."))
@@ -62,6 +67,10 @@ func main() {
 	r.Mount("/templates", TemplateResource{
 		TemplateService: templateService,
 	}.Routes())
+	r.Mount("/branching", BranchingResource{
+		BranchingService: branchingService,
+	}.Routes())
+	r.Mount("/auth", AuthResource{}.Routes())
 
 	http.ListenAndServe(":3333", r)
 }

@@ -34,14 +34,14 @@ func (s Service) GetProgress(flowId string, userId string) (*FlowProgress, error
 	return progress, nil
 }
 
-func (s Service) MoveToNextStep(flowId string, userId string, completionDate int32) (*flow.Step, error) {
+func (s Service) MoveToNextStep(workspace string, flowId string, userId string, completionDate int32) (*flow.Step, error) {
 	currentProgress, err := s.GetProgress(flowId, userId)
 	if err != nil {
 		return nil, err
 	}
 
 	if nil == currentProgress {
-		nextStep, err := s.FlowService.GetRootStep(flowId)
+		nextStep, err := s.FlowService.GetRootStep(workspace, flowId)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +75,7 @@ func (s Service) MoveToNextStep(flowId string, userId string, completionDate int
 		EffectiveAt: primitive.Timestamp{T: uint32(completionDate)},
 	})
 
-	nextStep, err := s.FlowService.GetChildrenStep(flowId, currentProgress.StepId, "")
+	nextStep, err := s.FlowService.GetChildrenStep(workspace, flowId, currentProgress.StepId, "")
 	if err != nil {
 		return nil, err
 	}
@@ -98,14 +98,14 @@ func (s Service) MoveToNextStep(flowId string, userId string, completionDate int
 	return nextStep, nil
 }
 
-func (s Service) StartStep(flowId string, stepId string, userId string, timestamp uint32) (*flow.Step, error) {
+func (s Service) StartStep(workspace string, flowId string, stepId string, userId string, timestamp uint32) (*flow.Step, error) {
 	var nextStep *flow.Step
 	var err error
 	if "0" == stepId {
-		nextStep, err = s.FlowService.GetRootStep(flowId)
+		nextStep, err = s.FlowService.GetRootStep(workspace, flowId)
 	} else {
 		var flowRes *flow.Flow
-		flowRes, err = s.FlowService.Get(flowId)
+		flowRes, err = s.FlowService.Get(workspace, flowId)
 		if flowRes != nil {
 			for i := range flowRes.Steps {
 				if flowRes.Steps[i].StepID == stepId {
@@ -135,8 +135,8 @@ func (s Service) StartStep(flowId string, stepId string, userId string, timestam
 	return nextStep, nil
 }
 
-func (s Service) CompleteStep(flowId string, stepId string, userId string, timestamp uint32, segmentId string) (*flow.Step, error) {
-	nextStep, err := s.FlowService.GetChildrenStep(flowId, stepId, segmentId)
+func (s Service) CompleteStep(workspace string, flowId string, stepId string, userId string, timestamp uint32, segmentId string) (*flow.Step, error) {
+	nextStep, err := s.FlowService.GetChildrenStep(workspace, flowId, stepId, segmentId)
 	if err != nil {
 		return nil, err
 	}

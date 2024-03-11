@@ -75,7 +75,16 @@ func (s Service) CreateFromTemplate(id string, override flow.Flow) (interface{},
 				ParentNodeId: flowTemplate.Steps[0].StepID,
 				StepID:       segment.SegmentID,
 				Data: flow.StepData{
-					Name: segment.Name + " Step 1",
+					Blocks: []flow.StepBlock{
+						{
+							Type:  flow.StepBlockTypeText,
+							Data:  segment.Name + " Step 1",
+							Order: 1,
+						},
+					},
+					ElementType: flow.StepElementTypeTooltip,
+					Placement:   flow.StepPlacementBottom,
+					ActionType:  flow.StepActionTypeAction,
 				},
 				Opts: flow.StepOpts{
 					SegmentID: segment.SegmentID,

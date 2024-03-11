@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -14,7 +15,7 @@ type Service struct {
 	Collection *mongo.Collection
 }
 
-func (s Service) Get(id string) (*Flow, error) {
+func (s Service) Get(workspace string, id string) (*Flow, error) {
 	flowID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
@@ -29,8 +30,8 @@ func (s Service) Get(id string) (*Flow, error) {
 	return &flow, nil
 }
 
-func (s Service) GetChildrenStep(flowId string, parentStepId string, segmentId string) (*Step, error) {
-	flow, err := s.Get(flowId)
+func (s Service) GetChildrenStep(workspace string, flowId string, parentStepId string, segmentId string) (*Step, error) {
+	flow, err := s.Get(workspace, flowId)
 	if err != nil {
 		return nil, err
 	}
@@ -44,23 +45,18 @@ func (s Service) GetChildrenStep(flowId string, parentStepId string, segmentId s
 	return nil, nil
 }
 
-func (s Service) GetStep(flowId string, stepId string) (*Step, error) {
-	flow, err := s.Get(flowId)
-	if err != nil {
-		return nil, err
-	}
-
+func (s Service) GetStep(workspace string, flow *Flow, stepId string) *Step {
 	for i := range flow.Steps {
 		if flow.Steps[i].StepID == stepId {
-			return &flow.Steps[i], nil
+			return &flow.Steps[i]
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
-func (s Service) GetRootStep(flowId string) (*Step, error) {
-	flow, err := s.Get(flowId)
+func (s Service) GetRootStep(workspace string, flowId string) (*Step, error) {
+	flow, err := s.Get(workspace, flowId)
 	if err != nil {
 		return nil, err
 	}
@@ -76,27 +72,30 @@ func (s Service) GetRootStep(flowId string) (*Step, error) {
 	return nil, errors.New("invalid flow id / no root available")
 }
 
-func (s Service) List() ([]*Flow, error) {
+func (s Service) List(workspace string) ([]*Flow, error) {
 	cursor, err := s.Collection.Find(context.Background(), bson.M{})
 	if err != nil {
 		return nil, err
 	}
 
-	var flows []*Flow
+	flows := make([]*Flow, 0)
 	for cursor.Next(context.Background()) {
 		var resFlow Flow
 		err := cursor.Decode(&resFlow)
 		if err != nil {
 			log.Fatal(err)
 		}
-		flows = append(flows, &resFlow)
+
+		if resFlow.WorkspaceID == workspace {
+			flows = append(flows, &resFlow)
+		}
 	}
 
 	return flows, nil
 }
 
-func (s Service) Update(id string, updateInput UpdateInput) error {
-	flow, err := s.Get(id)
+func (s Service) Update(workspace string, id string, updateInput UpdateInput) error {
+	flow, err := s.Get(workspace, id)
 	if err != nil {
 		return err
 	}
@@ -145,12 +144,49 @@ func (s Service) Update(id string, updateInput UpdateInput) error {
 
 	for _, updatedSegment := range updateInput.Segments {
 		if len(updatedSegment.Name) > 0 {
+			found := false
 			for i := range flow.Segments {
 				if flow.Segments[i].SegmentID == updatedSegment.SegmentID {
 					flow.Segments[i].Name = updatedSegment.Name
+					found = true
 					break
 				}
 			}
+
+			if !found {
+				flow.Segments = append(flow.Segments, Segment{
+					SegmentID: uuid.New().String(),
+					Name:      updatedSegment.Name,
+					IconURL:   updatedSegment.IconURL,
+				})
+			}
+		}
+	}
+
+	if updateInput.Trigger.TriggerID != "" {
+		flow.Opts.Trigger = updateInput.Trigger
+	}
+	if updateInput.Targeting.TargetingID != "" {
+		flow.Opts.Targeting = updateInput.Targeting
+	}
+	if updateInput.FinishEffect != nil {
+		flow.Opts.FinishEffect = *updateInput.FinishEffect
+	}
+	if len(updateInput.Segments) == 0 {
+		flow.Opts.Segmentation = false
+	}
+
+	if nil != updateInput.Opts {
+		if updateInput.Opts.ThemeColor != "" {
+			flow.Opts.ThemeColor = updateInput.Opts.ThemeColor
+		}
+		//if updateInput.Opts.AvatarId != "" {
+		//	flow.Opts.AvatarId = updateInput.Opts.AvatarId
+		//}
+		flow.Opts.AvatarId = updateInput.Opts.AvatarId
+
+		if updateInput.Opts.ElementTemplate != "" {
+			flow.Opts.ElementTemplate = updateInput.Opts.ElementTemplate
 		}
 	}
 
@@ -162,39 +198,46 @@ func (s Service) Update(id string, updateInput UpdateInput) error {
 	return err
 }
 
-func (s Service) UpdateStepData(id string, idStep string, updateStepDataInput StepData) error {
-	flow, err := s.Get(id)
-	if err != nil {
-		return err
+func (s Service) UpdateStep(workspace string, flow *Flow, stepID string, updateInput Step) error {
+	step := s.GetStep(workspace, flow, stepID)
+	if step == nil {
+		return errors.New("step not found")
 	}
 
-	for i := range flow.Steps {
-		if flow.Steps[i].StepID == idStep {
-			if len(updateStepDataInput.AssignedCssElement) > 0 {
-				flow.Steps[i].Data.AssignedCssElement = updateStepDataInput.AssignedCssElement
-			}
-			break
-		}
+	step.Data = updateInput.Data
+	if len(updateInput.ParentNodeId) > 0 {
+		step.ParentNodeId = updateInput.ParentNodeId
 	}
-
-	err = s.saveUpdatedFlow(flow)
+	err := s.saveUpdatedFlow(flow)
 
 	return err
 }
 
-func (s Service) Capture(id string, newSteps []Step) error {
-	flow, err := s.Get(id)
-	if err != nil {
-		return err
+func (s Service) Capture(workspace string, id string, input UpdateInput) (string, error) {
+	flow := Flow{
+		Name:        *input.Name,
+		BaseURL:     *input.BaseURL,
+		WorkspaceID: workspace,
+		Steps:       input.NewSteps,
+		Opts: Opts{
+			Segmentation:    false,
+			Targeting:       Targeting{},
+			Trigger:         Trigger{},
+			ThemeColor:      "#000000",
+			AvatarId:        "",
+			ElementTemplate: "light",
+			FinishEffect:    FinishEffect{},
+		},
 	}
 
-	flow.Steps = newSteps
-	flow.Segments = make([]Segment, 0)
-	s.updateStepsRelations(flow)
+	s.updateStepsRelations(&flow)
 
-	err = s.saveUpdatedFlow(flow)
+	newId, err := s.Collection.InsertOne(context.Background(), flow)
+	if err != nil {
+		return "", err
+	}
 
-	return err
+	return newId.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
 func (s Service) updateStepData(flow *Flow, updatedStep *Step) {
@@ -209,21 +252,28 @@ func (s Service) updateStepData(flow *Flow, updatedStep *Step) {
 		}
 	}
 
+	// Create new step
+	s.createNewStep(flow, updatedStep)
+}
+
+func (s Service) createNewStep(flow *Flow, updatedStep *Step) {
+	var rightNode *Step
+	for i := range flow.Steps {
+		if flow.Steps[i].ParentNodeId == updatedStep.ParentNodeId {
+			rightNode = &flow.Steps[i]
+			break
+		}
+	}
+
+	if rightNode != nil {
+		rightNode.ParentNodeId = updatedStep.StepID
+	}
 	flow.Steps = append(flow.Steps, Step{
 		StepID:       updatedStep.StepID,
 		ParentNodeId: updatedStep.ParentNodeId,
-		Data: StepData{
-			Name:               updatedStep.Data.Name,
-			Description:        updatedStep.Data.Description,
-			TargetUrl:          updatedStep.Data.TargetUrl,
-			AssignedCssElement: updatedStep.Data.AssignedCssElement,
-			ElementType:        updatedStep.Data.ElementType,
-			Placement:          updatedStep.Data.Placement,
-			ElementTemplate:    updatedStep.Data.ElementTemplate,
-		},
+		Data:         updatedStep.Data,
 		Opts: StepOpts{
-			SegmentID:  updatedStep.Opts.SegmentID,
-			Transition: updatedStep.Opts.Transition,
+			SegmentID: updatedStep.Opts.SegmentID,
 		},
 	})
 }
@@ -243,6 +293,8 @@ func (s Service) updateStepsRelations(flow *Flow) {
 			flow.Steps[i].Opts.IsSource = true
 			sourceStep = &flow.Steps[i]
 			continue
+		} else {
+			flow.Steps[i].Opts.IsSource = false
 		}
 		adjList[flow.Steps[i].ParentNodeId] = append(adjList[flow.Steps[i].ParentNodeId], &flow.Steps[i])
 	}
