@@ -13,6 +13,11 @@ import (
 func CognitoMiddleware(userPoolID, region string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/health") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
 				http.Error(w, "Authorization header is required", http.StatusUnauthorized)
@@ -22,6 +27,12 @@ func CognitoMiddleware(userPoolID, region string) func(http.Handler) http.Handle
 			authToken := strings.TrimPrefix(authHeader, "Bearer ")
 			if authToken == authHeader {
 				http.Error(w, "Bearer token not found", http.StatusUnauthorized)
+				return
+			}
+
+			if strings.HasPrefix(r.URL.Path, "/public/") {
+				ctx := context.WithValue(r.Context(), "token", authToken)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 

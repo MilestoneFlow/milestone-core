@@ -1,18 +1,26 @@
 package users
 
+import "go.mongodb.org/mongo-driver/bson/primitive"
+
 type EnrolledUser struct {
-	Id             string `json:"id" bson:"_id"`
-	ExternalId     string `json:"externalId" bson:"externalId"`
-	Email          string `json:"email,omitempty" bson:"email,omitempty"`
-	OrganizationId string `json:"organizationId,omitempty" bson:"organizationId,omitempty"`
+	ID              primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	WorkspaceId     string             `json:"workspaceId" bson:"workspaceId"`
+	Created         int64              `json:"created" bson:"created"`
+	ExternalId      string             `json:"externalId" bson:"externalId"`
+	Email           string             `json:"email,omitempty" bson:"email,omitempty"`
+	Name            string             `json:"name,omitempty" bson:"name,omitempty"`
+	SignUpTimestamp int64              `json:"signUpTimestamp,omitempty" bson:"signUpTimestamp,omitempty"`
+	Segment         string             `json:"segment,omitempty" bson:"segment,omitempty"`
 }
 
 type UserState struct {
-	UserId                string          `json:"userId" bson:"userId"`
-	CurrentEnrolledFlowId string          `json:"currentEnrolledFlowId" bson:"currentEnrolledFlowId"`
-	CurrentStepId         string          `json:"currentStepId" bson:"currentStepId"`
-	Times                 []UserStateTime `json:"times" bson:"times"`
-	Created               int64           `json:"created" bson:"created"`
+	ID                    primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Workspace             string             `json:"workspace" bson:"workspace"`
+	UserId                string             `json:"userId" bson:"userId"`
+	CurrentEnrolledFlowId string             `json:"currentEnrolledFlowId" bson:"currentEnrolledFlowId"`
+	CurrentStepId         string             `json:"currentStepId" bson:"currentStepId"`
+	Times                 []UserStateTime    `json:"times" bson:"times"`
+	Created               int64              `json:"created" bson:"created"`
 }
 
 type UserStateTime struct {

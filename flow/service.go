@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
+	"milestone_core/users"
 )
 
 type Service struct {
@@ -22,7 +23,7 @@ func (s Service) Get(workspace string, id string) (*Flow, error) {
 	}
 
 	var flow Flow
-	err = s.Collection.FindOne(context.Background(), bson.M{"_id": flowID}).Decode(&flow)
+	err = s.Collection.FindOne(context.Background(), bson.M{"_id": flowID, "workspaceId": workspace}).Decode(&flow)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +75,28 @@ func (s Service) GetRootStep(workspace string, flowId string) (*Step, error) {
 
 func (s Service) List(workspace string) ([]*Flow, error) {
 	cursor, err := s.Collection.Find(context.Background(), bson.M{})
+	if err != nil {
+		return nil, err
+	}
+
+	flows := make([]*Flow, 0)
+	for cursor.Next(context.Background()) {
+		var resFlow Flow
+		err := cursor.Decode(&resFlow)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if resFlow.WorkspaceID == workspace {
+			flows = append(flows, &resFlow)
+		}
+	}
+
+	return flows, nil
+}
+
+func (s Service) ListLive(workspace string) ([]*Flow, error) {
+	cursor, err := s.Collection.Find(context.Background(), bson.M{"live": true})
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +261,77 @@ func (s Service) Capture(workspace string, id string, input UpdateInput) (string
 	}
 
 	return newId.InsertedID.(primitive.ObjectID).Hex(), nil
+}
+
+func (s Service) GetFlowAnalytics(workspace string, flowId string) (FlowAnalytics, error) {
+	flow, err := s.Get(workspace, flowId)
+	if err != nil {
+		return FlowAnalytics{
+			FlowID:       "",
+			Views:        0,
+			AvgTotalTime: 0,
+			AvgStepTime:  nil,
+		}, err
+	}
+	if flow == nil {
+		return FlowAnalytics{
+			FlowID:       "",
+			Views:        0,
+			AvgTotalTime: 0,
+			AvgStepTime:  nil,
+		}, nil
+	}
+
+	analytics := FlowAnalytics{
+		FlowID:       flow.ID.Hex(),
+		Views:        0,
+		AvgTotalTime: 0,
+		AvgStepTime:  make(map[string]int64),
+	}
+
+	result, err := s.Collection.Database().Collection("users_state").Find(context.Background(), bson.M{"currentEnrolledFlowId": flow.ID.Hex()})
+	if err != nil {
+		return analytics, err
+	}
+
+	statesArr := make([]*users.UserState, 0)
+	for result.Next(context.Background()) {
+		var statesObj users.UserState
+		err := result.Decode(&statesObj)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		statesArr = append(statesArr, &statesObj)
+	}
+
+	if len(statesArr) == 0 {
+		return analytics, nil
+	}
+
+	analytics.Views = len(statesArr)
+	noOfSteps := len(flow.Steps)
+	noOfValidStates := 0
+	totalFlowAvgTime := int64(0)
+	stepAvgTime := make(map[string]int64)
+	for _, state := range statesArr {
+		currentFlowAvgTime := int64(0)
+		if len(state.Times) == noOfSteps {
+			noOfValidStates += 1
+			for _, time := range state.Times {
+				stepAvgTime[time.StepId] += time.EndTimestamp - time.StartTimestamp
+				currentFlowAvgTime += time.EndTimestamp - time.StartTimestamp
+			}
+		}
+		totalFlowAvgTime += currentFlowAvgTime
+	}
+	totalFlowAvgTime = totalFlowAvgTime / int64(noOfValidStates)
+	analytics.AvgTotalTime = totalFlowAvgTime
+	for stepId, time := range stepAvgTime {
+		analytics.AvgStepTime[stepId] = time / int64(noOfValidStates)
+	}
+
+	return analytics, nil
 }
 
 func (s Service) updateStepData(flow *Flow, updatedStep *Step) {

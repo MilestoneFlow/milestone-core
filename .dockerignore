@@ -1,0 +1,7 @@
+deployment/
+.git/
+*.log
+tmp/
+MilestoneCoreStagingInstance.pem
+milestone_core
+.env.example

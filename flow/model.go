@@ -50,6 +50,7 @@ type Flow struct {
 	Steps       []Step             `json:"steps" bson:"steps"`
 	Relations   []Relation         `json:"relations" bson:"relations"`
 	Opts        Opts               `json:"opts,omitempty" bson:"opts,omitempty"`
+	Live        bool               `json:"live,omitempty" bson:"live,omitempty"`
 }
 
 type Relation struct {
@@ -156,4 +157,11 @@ type BranchingVariant struct {
 	VariantID string `json:"variantId" bson:"variantId"`
 	FlowID    string `json:"flowId" bson:"flowId"`
 	Name      string `json:"name" bson:"name"`
+}
+
+type FlowAnalytics struct {
+	FlowID       string           `json:"flowId" bson:"flowId"`
+	Views        int              `json:"views" bson:"views"`
+	AvgTotalTime int64            `json:"avgTotalTime" bson:"avgTotalTime"`
+	AvgStepTime  map[string]int64 `json:"avgStepTime" bson:"avgStepTime"`
 }

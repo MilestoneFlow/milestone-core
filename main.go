@@ -6,9 +6,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
+	"milestone_core/apiclient"
 	"milestone_core/authorization"
 	"milestone_core/flow"
 	"milestone_core/progress"
+	"milestone_core/publicapi"
 	"milestone_core/template"
 	"milestone_core/users"
 	"net/http"
@@ -29,14 +31,22 @@ func main() {
 	templateCollection := flowDbConnection.Collection("flows_templates")
 	usersCollection := flowDbConnection.Collection("enrolled_users")
 	branchingCollection := flowDbConnection.Collection("branching")
+	apiClientsCollection := flowDbConnection.Collection("api_clients")
+	usersStateCollection := flowDbConnection.Collection("users_state")
 
 	log.Default().Print("a mers si colectii")
 
 	flowService := flow.Service{Collection: flowCollection}
 	progressService := progress.Service{Collection: progressCollection, FlowService: flowService}
 	templateService := template.Service{Collection: templateCollection, FlowCollection: flowCollection}
-	usersService := users.Service{Collection: usersCollection}
+	usersService := users.Service{Collection: usersCollection, UserStateCollection: usersStateCollection}
 	branchingService := flow.BranchingService{Collection: branchingCollection}
+	apiClientService := apiclient.Service{Collection: apiClientsCollection}
+	publicapiService := publicapi.Service{
+		ApiClientService:    apiClientService,
+		FlowService:         flowService,
+		EnrolledUserService: usersService,
+	}
 
 	r := chi.NewRouter()
 	corsMiddleware := cors.New(cors.Options{
@@ -58,6 +68,10 @@ func main() {
 		w.Write([]byte("."))
 	})
 
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("."))
+	})
+
 	r.Mount("/enrolled-users", usersResource{usersService: usersService}.Routes())
 	r.Mount("/todos", todosResource{}.Routes())
 	r.Mount("/flows", FlowsResource{
@@ -71,6 +85,12 @@ func main() {
 		BranchingService: branchingService,
 	}.Routes())
 	r.Mount("/auth", AuthResource{}.Routes())
+	r.Mount("/apiclients", ApiClientResource{
+		Service: apiClientService,
+	}.Routes())
+	r.Mount("/public", PublicApiResource{
+		Service: publicapiService,
+	}.Routes())
 
 	http.ListenAndServe(":3333", r)
 }

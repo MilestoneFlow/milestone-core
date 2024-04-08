@@ -40,6 +40,7 @@ func (rs FlowsResource) Routes() chi.Router {
 		r.Post("/continue", rs.MoveToNextStep)
 		r.Put("/{stepId}", rs.UpdateStep)
 		r.Post("/capture", rs.Capture)
+		r.Get("/analytics", rs.GetFlowAnalytics)
 	})
 
 	return r
@@ -198,4 +199,17 @@ func (rs FlowsResource) UploadMediaFile(w http.ResponseWriter, r *http.Request) 
 	}{
 		FileName: "https://milestone-uploaded-flows-media.s3.amazonaws.com/step_media/" + filename,
 	})
+}
+
+func (rs FlowsResource) GetFlowAnalytics(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	workspace := r.Context().Value("workspace").(string)
+
+	analytics, err := rs.FlowService.GetFlowAnalytics(workspace, idParam)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, analytics)
 }

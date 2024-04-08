@@ -50,6 +50,7 @@ func (rs TemplateResource) Get(w http.ResponseWriter, r *http.Request) {
 
 func (rs TemplateResource) CreateFromTemplate(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
+	workspace := r.Context().Value("workspace").(string)
 
 	override := flow.Flow{}
 	err := json.NewDecoder(r.Body).Decode(&override)
@@ -58,7 +59,7 @@ func (rs TemplateResource) CreateFromTemplate(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	id, err := rs.TemplateService.CreateFromTemplate(idParam, override)
+	id, err := rs.TemplateService.CreateFromTemplate(workspace, idParam, override)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return

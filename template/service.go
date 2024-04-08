@@ -48,7 +48,7 @@ func (s Service) Get(id string) (*flow.Flow, error) {
 	return &flowTemplate, nil
 }
 
-func (s Service) CreateFromTemplate(id string, override flow.Flow) (interface{}, error) {
+func (s Service) CreateFromTemplate(workspace string, id string, override flow.Flow) (interface{}, error) {
 	flowTemplate, err := s.Get(id)
 	if err != nil {
 		return primitive.NilObjectID, err
@@ -97,6 +97,7 @@ func (s Service) CreateFromTemplate(id string, override flow.Flow) (interface{},
 	}
 
 	flowTemplate.ID = primitive.NilObjectID
+	flowTemplate.WorkspaceID = workspace
 	result, err := s.FlowCollection.InsertOne(context.Background(), flowTemplate)
 	if err != nil {
 		return primitive.NilObjectID, err

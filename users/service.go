@@ -2,12 +2,16 @@ package users
 
 import (
 	"context"
+	"errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"time"
 )
 
 type Service struct {
-	Collection *mongo.Collection
+	Collection          *mongo.Collection
+	UserStateCollection *mongo.Collection
 }
 
 func (s Service) List() ([]*EnrolledUser, error) {
@@ -29,10 +33,14 @@ func (s Service) List() ([]*EnrolledUser, error) {
 	return users, nil
 }
 
-func (s Service) Get(id string) (*EnrolledUser, error) {
+func (s Service) Get(workspace string, externalId string) (*EnrolledUser, error) {
 	var user EnrolledUser
-	err := s.Collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&user)
+	err := s.Collection.FindOne(context.Background(), bson.M{"externalId": externalId, "workspaceId": workspace}).Decode(&user)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
+
 		return nil, err
 	}
 
@@ -40,6 +48,7 @@ func (s Service) Get(id string) (*EnrolledUser, error) {
 }
 
 func (s Service) Create(user EnrolledUser) (interface{}, error) {
+	user.Created = time.Now().Unix()
 	result, err := s.Collection.InsertOne(context.Background(), user)
 	if err != nil {
 		return nil, err
@@ -55,4 +64,44 @@ func (s Service) Delete(id string) error {
 	}
 
 	return nil
+}
+
+func (s Service) GetLastUserState(workspace string, userId string) (*UserState, error) {
+	var userState UserState
+
+	opts := options.FindOne().SetSort(bson.D{{"created", -1}})
+	err := s.UserStateCollection.FindOne(context.Background(), bson.M{"userId": userId, "workspace": workspace}, opts).Decode(&userState)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &userState, nil
+}
+
+func (s Service) GetFinishedFlowsForUser(workspace string, userId string) ([]string, error) {
+	results, err := s.UserStateCollection.Distinct(context.Background(), "currentEnrolledFlowId", bson.M{"userId": userId, "workspace": workspace})
+	if err != nil {
+		return nil, err
+	}
+
+	flowsIds := make([]string, 0)
+	for _, res := range results {
+		flowsIds = append(flowsIds, res.(string))
+	}
+
+	return flowsIds, nil
+}
+
+func (s Service) CreateUserState(workspace string, userState UserState) (interface{}, error) {
+	userState.Created = time.Now().Unix()
+	userState.Workspace = workspace
+	result, err := s.UserStateCollection.InsertOne(context.Background(), userState)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.InsertedID, nil
 }

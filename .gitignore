@@ -2,3 +2,5 @@
 /.env
 /db_data/
 /milestone_core
+
+MilestoneCoreStagingInstance.pem

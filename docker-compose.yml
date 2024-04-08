@@ -27,5 +27,19 @@ services:
     networks:
       - common-net
 
+  milestone_flow_test_db:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${FLOW_DB_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${FLOW_DB_ROOT_PASSWORD}
+    command: mongod --port 27018
+    ports:
+      - "27018:27018"
+    volumes:
+      - ./db_data/flow_test_db:/data/db
+      - ./scripts/flow-db-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro
+    networks:
+      - common-net
 networks:
   common-net: { }
