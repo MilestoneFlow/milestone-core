@@ -41,6 +41,8 @@ func (rs FlowsResource) Routes() chi.Router {
 		r.Put("/{stepId}", rs.UpdateStep)
 		r.Post("/capture", rs.Capture)
 		r.Get("/analytics", rs.GetFlowAnalytics)
+		r.Post("/publish", rs.Publish)
+		r.Post("/unpublish", rs.Unpublish)
 	})
 
 	return r
@@ -212,4 +214,30 @@ func (rs FlowsResource) GetFlowAnalytics(w http.ResponseWriter, r *http.Request)
 	}
 
 	server.SendJson(w, analytics)
+}
+
+func (rs FlowsResource) Publish(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+
+	err := rs.FlowService.Publish(workspaceId, idParam)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, "published flow with id: "+idParam)
+}
+
+func (rs FlowsResource) Unpublish(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+
+	err := rs.FlowService.UnPublish(workspaceId, idParam)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, "unpublished flow with id: "+idParam)
 }

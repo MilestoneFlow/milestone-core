@@ -95,6 +95,30 @@ func (s Service) List(workspace string) ([]*Flow, error) {
 	return flows, nil
 }
 
+func (s Service) Publish(workspace string, id string) error {
+	flow, err := s.Get(workspace, id)
+	if err != nil {
+		return err
+	}
+
+	flow.Live = true
+	err = s.saveUpdatedFlow(flow)
+
+	return err
+}
+
+func (s Service) UnPublish(workspace string, id string) error {
+	flow, err := s.Get(workspace, id)
+	if err != nil {
+		return err
+	}
+
+	flow.Live = false
+	err = s.saveUpdatedFlow(flow)
+
+	return err
+}
+
 func (s Service) ListLive(workspace string) ([]*Flow, error) {
 	cursor, err := s.Collection.Find(context.Background(), bson.M{"live": true})
 	if err != nil {

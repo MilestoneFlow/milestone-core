@@ -50,7 +50,7 @@ type Flow struct {
 	Steps       []Step             `json:"steps" bson:"steps"`
 	Relations   []Relation         `json:"relations" bson:"relations"`
 	Opts        Opts               `json:"opts,omitempty" bson:"opts,omitempty"`
-	Live        bool               `json:"live,omitempty" bson:"live,omitempty"`
+	Live        bool               `json:"live" bson:"live"`
 }
 
 type Relation struct {
