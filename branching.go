@@ -34,9 +34,9 @@ func (rs BranchingResource) Routes() chi.Router {
 }
 
 func (rs BranchingResource) List(w http.ResponseWriter, r *http.Request) {
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	branches, err := rs.BranchingService.List(workspace)
+	branches, err := rs.BranchingService.List(workspaceId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -49,8 +49,8 @@ func (rs BranchingResource) Get(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 
 	// Iterate through the cursor and decode documents into User structs
-	workspace := r.Context().Value("workspace").(string)
-	branch, err := rs.BranchingService.Get(workspace, idParam)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+	branch, err := rs.BranchingService.Get(workspaceId, idParam)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -69,8 +69,8 @@ func (rs BranchingResource) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workspace := r.Context().Value("workspace").(string)
-	err = rs.BranchingService.Update(workspace, idParam, updateInput)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+	err = rs.BranchingService.Update(workspaceId, idParam, updateInput)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -87,8 +87,8 @@ func (rs BranchingResource) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workspace := r.Context().Value("workspace").(string)
-	res, err := rs.BranchingService.Create(workspace, branch)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+	res, err := rs.BranchingService.Create(workspaceId, branch)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return

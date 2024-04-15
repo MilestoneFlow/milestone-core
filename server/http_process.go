@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log"
+	"milestone_core/authorization"
 	"net/http"
 )
 
@@ -14,13 +16,19 @@ type MessageResponse struct {
 	Message string `json:"message"`
 }
 
+func GetWorkspaceIdFromContext(ctx context.Context) string {
+	userData := ctx.Value("user").(authorization.UserData)
+
+	return userData.WorkspaceID
+}
+
 func SendJson(writer http.ResponseWriter, data any) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-	
+
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("Content-Type", "application/json")
 	_, err = writer.Write(jsonData)
@@ -55,8 +63,8 @@ func SendBadRequestErrorJson(writer http.ResponseWriter, error error) {
 		return
 	}
 
-	writer.WriteHeader(http.StatusBadRequest)
 	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusBadRequest)
 	_, err = writer.Write(jsonData)
 	if err != nil {
 		log.Fatal(err)

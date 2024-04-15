@@ -14,12 +14,9 @@ type usersResource struct {
 	usersService users.Service
 }
 
-// Routes creates a REST router for the todos resource
 func (rs usersResource) Routes() chi.Router {
 	r := chi.NewRouter()
-	// r.Use() // some middleware..
-
-	r.Get("/", rs.List) // GET /users - read a list of users
+	r.Get("/", rs.List)
 
 	return r
 }
@@ -31,7 +28,9 @@ func (rs usersResource) List(w http.ResponseWriter, r *http.Request) {
 	pageNumber, _ := strconv.Atoi(pageNumberStr)
 	rowsPerPage, _ := strconv.Atoi(rowsPerPageStr)
 
-	enrolledUsers, err := rs.usersService.List()
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+
+	enrolledUsers, err := rs.usersService.List(workspaceId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -39,7 +38,7 @@ func (rs usersResource) List(w http.ResponseWriter, r *http.Request) {
 
 	totalPagesNumber := int(math.Ceil(float64(float32(len(enrolledUsers)) / float32(rowsPerPage))))
 
-	usersOffset := rowsPerPage * (pageNumber - 1)
+	usersOffset := min(rowsPerPage*(pageNumber-1), len(enrolledUsers))
 	usersMax := min(usersOffset+rowsPerPage, len(enrolledUsers))
 	paginatedEnrolledUsers := enrolledUsers[usersOffset:usersMax]
 	var response = struct {

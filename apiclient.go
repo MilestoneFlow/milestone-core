@@ -24,8 +24,8 @@ func (rs ApiClientResource) Routes() chi.Router {
 }
 
 func (rs ApiClientResource) List(w http.ResponseWriter, r *http.Request) {
-	workspace := r.Context().Value("workspace").(string)
-	apiClients, err := rs.Service.List(workspace)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+	apiClients, err := rs.Service.List(workspaceId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -35,9 +35,9 @@ func (rs ApiClientResource) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs ApiClientResource) Get(w http.ResponseWriter, r *http.Request) {
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 	id := chi.URLParam(r, "id")
-	apiClient, err := rs.Service.Get(workspace, id)
+	apiClient, err := rs.Service.Get(workspaceId, id)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -47,9 +47,9 @@ func (rs ApiClientResource) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs ApiClientResource) Create(w http.ResponseWriter, r *http.Request) {
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	token, err := rs.Service.Create(workspace)
+	token, err := rs.Service.Create(workspaceId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -61,9 +61,9 @@ func (rs ApiClientResource) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs ApiClientResource) Delete(w http.ResponseWriter, r *http.Request) {
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 	id := chi.URLParam(r, "id")
-	err := rs.Service.Delete(workspace, id)
+	err := rs.Service.Delete(workspaceId, id)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return

@@ -325,10 +325,16 @@ func (s Service) GetFlowAnalytics(workspace string, flowId string) (FlowAnalytic
 		}
 		totalFlowAvgTime += currentFlowAvgTime
 	}
-	totalFlowAvgTime = totalFlowAvgTime / int64(noOfValidStates)
+	totalFlowAvgTime = 0
+	if noOfValidStates > 0 {
+		totalFlowAvgTime = totalFlowAvgTime / int64(noOfValidStates)
+	}
 	analytics.AvgTotalTime = totalFlowAvgTime
 	for stepId, time := range stepAvgTime {
-		analytics.AvgStepTime[stepId] = time / int64(noOfValidStates)
+		analytics.AvgStepTime[stepId] = 0
+		if noOfValidStates > 0 {
+			analytics.AvgStepTime[stepId] = time / int64(noOfValidStates)
+		}
 	}
 
 	return analytics, nil

@@ -13,6 +13,7 @@ import (
 	"milestone_core/publicapi"
 	"milestone_core/template"
 	"milestone_core/users"
+	"milestone_core/workspace"
 	"net/http"
 	"os"
 
@@ -33,6 +34,7 @@ func main() {
 	branchingCollection := flowDbConnection.Collection("branching")
 	apiClientsCollection := flowDbConnection.Collection("api_clients")
 	usersStateCollection := flowDbConnection.Collection("users_state")
+	workspaceCollection := flowDbConnection.Collection("workspaces")
 
 	log.Default().Print("a mers si colectii")
 
@@ -47,6 +49,7 @@ func main() {
 		FlowService:         flowService,
 		EnrolledUserService: usersService,
 	}
+	workspaceService := workspace.Service{Collection: workspaceCollection}
 
 	r := chi.NewRouter()
 	corsMiddleware := cors.New(cors.Options{
@@ -57,7 +60,7 @@ func main() {
 	})
 
 	r.Use(corsMiddleware.Handler)
-	r.Use(authorization.CognitoMiddleware("us-east-1_zrIqQshjP", "us-east-1"))
+	r.Use(authorization.CognitoMiddleware(workspaceCollection, "us-east-1"))
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -83,6 +86,9 @@ func main() {
 	}.Routes())
 	r.Mount("/branching", BranchingResource{
 		BranchingService: branchingService,
+	}.Routes())
+	r.Mount("/workspaces", workspace.Resource{
+		Service: workspaceService,
 	}.Routes())
 	r.Mount("/auth", AuthResource{}.Routes())
 	r.Mount("/apiclients", ApiClientResource{

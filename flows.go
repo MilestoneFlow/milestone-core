@@ -47,8 +47,8 @@ func (rs FlowsResource) Routes() chi.Router {
 }
 
 func (rs FlowsResource) List(w http.ResponseWriter, r *http.Request) {
-	workspace := r.Context().Value("workspace").(string)
-	flows, err := rs.FlowService.List(workspace)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+	flows, err := rs.FlowService.List(workspaceId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -59,10 +59,10 @@ func (rs FlowsResource) List(w http.ResponseWriter, r *http.Request) {
 
 func (rs FlowsResource) Get(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
 	// Iterate through the cursor and decode documents into User structs
-	resultFlow, err := rs.FlowService.Get(workspace, idParam)
+	resultFlow, err := rs.FlowService.Get(workspaceId, idParam)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -73,7 +73,7 @@ func (rs FlowsResource) Get(w http.ResponseWriter, r *http.Request) {
 
 func (rs FlowsResource) Update(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
 	var updateInput flow.UpdateInput
 	err := json.NewDecoder(r.Body).Decode(&updateInput)
@@ -82,7 +82,7 @@ func (rs FlowsResource) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = rs.FlowService.Update(workspace, idParam, updateInput)
+	err = rs.FlowService.Update(workspaceId, idParam, updateInput)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -93,9 +93,9 @@ func (rs FlowsResource) Update(w http.ResponseWriter, r *http.Request) {
 
 func (rs FlowsResource) MoveToNextStep(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	step, err := rs.ProgressService.MoveToNextStep(workspace, idParam, "1", int32(time.Now().Unix()))
+	step, err := rs.ProgressService.MoveToNextStep(workspaceId, idParam, "1", int32(time.Now().Unix()))
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -108,9 +108,9 @@ func (rs FlowsResource) MoveToNextStep(w http.ResponseWriter, r *http.Request) {
 func (rs FlowsResource) UpdateStep(w http.ResponseWriter, r *http.Request) {
 	flowId := chi.URLParam(r, "id")
 	stepId := chi.URLParam(r, "stepId")
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	inputFlow, err := rs.FlowService.Get(workspace, flowId)
+	inputFlow, err := rs.FlowService.Get(workspaceId, flowId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -123,7 +123,7 @@ func (rs FlowsResource) UpdateStep(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = rs.FlowService.UpdateStep(workspace, inputFlow, stepId, updateInput)
+	err = rs.FlowService.UpdateStep(workspaceId, inputFlow, stepId, updateInput)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -134,7 +134,7 @@ func (rs FlowsResource) UpdateStep(w http.ResponseWriter, r *http.Request) {
 
 func (rs FlowsResource) Capture(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
 	var updateInput flow.UpdateInput
 	err := json.NewDecoder(r.Body).Decode(&updateInput)
@@ -143,7 +143,7 @@ func (rs FlowsResource) Capture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newId, err := rs.FlowService.Capture(workspace, idParam, updateInput)
+	newId, err := rs.FlowService.Capture(workspaceId, idParam, updateInput)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -155,9 +155,9 @@ func (rs FlowsResource) Capture(w http.ResponseWriter, r *http.Request) {
 func (rs FlowsResource) UploadMediaFile(w http.ResponseWriter, r *http.Request) {
 	flowId := chi.URLParam(r, "id")
 	stepId := chi.URLParam(r, "stepId")
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	resFlow, err := rs.FlowService.Get(workspace, flowId)
+	resFlow, err := rs.FlowService.Get(workspaceId, flowId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -203,9 +203,9 @@ func (rs FlowsResource) UploadMediaFile(w http.ResponseWriter, r *http.Request) 
 
 func (rs FlowsResource) GetFlowAnalytics(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
-	workspace := r.Context().Value("workspace").(string)
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	analytics, err := rs.FlowService.GetFlowAnalytics(workspace, idParam)
+	analytics, err := rs.FlowService.GetFlowAnalytics(workspaceId, idParam)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return

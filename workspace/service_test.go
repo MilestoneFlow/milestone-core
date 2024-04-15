@@ -74,13 +74,13 @@ func TestGroup(t *testing.T) {
 	})
 
 	t.Run("Add user identifier in workspace", func(t *testing.T) {
-		newUserIdentifier := "newuser@email.com"
-		err := service.AddUserIdentifier(insertedWorkspaceID, newUserIdentifier)
+		newUserIdentifiers := []string{"newuser@email.com", "newuser@emaile.com"}
+		err := service.AddUserIdentifiers(insertedWorkspaceID, newUserIdentifiers)
 		if err != nil {
 			t.Fatalf("Error: %s", err)
 		}
 
-		resWorkspace, err := service.GetByUserIdentifier(newUserIdentifier)
+		resWorkspace, err := service.GetByUserIdentifier(newUserIdentifiers[1])
 		if err != nil {
 			t.Fatalf("Error: %s", err)
 		}

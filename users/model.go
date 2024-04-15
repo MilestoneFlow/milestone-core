@@ -15,7 +15,7 @@ type EnrolledUser struct {
 
 type UserState struct {
 	ID                    primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Workspace             string             `json:"workspace" bson:"workspace"`
+	WorkspaceId           string             `json:"workspaceId" bson:"workspaceId"`
 	UserId                string             `json:"userId" bson:"userId"`
 	CurrentEnrolledFlowId string             `json:"currentEnrolledFlowId" bson:"currentEnrolledFlowId"`
 	CurrentStepId         string             `json:"currentStepId" bson:"currentStepId"`

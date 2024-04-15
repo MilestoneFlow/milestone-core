@@ -14,8 +14,8 @@ type Service struct {
 	UserStateCollection *mongo.Collection
 }
 
-func (s Service) List() ([]*EnrolledUser, error) {
-	cursor, err := s.Collection.Find(context.Background(), bson.M{})
+func (s Service) List(workspaceId string) ([]*EnrolledUser, error) {
+	cursor, err := s.Collection.Find(context.Background(), bson.M{"workspaceId": workspaceId})
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (s Service) GetFinishedFlowsForUser(workspace string, userId string) ([]str
 
 func (s Service) CreateUserState(workspace string, userState UserState) (interface{}, error) {
 	userState.Created = time.Now().Unix()
-	userState.Workspace = workspace
+	userState.WorkspaceId = workspace
 	result, err := s.UserStateCollection.InsertOne(context.Background(), userState)
 	if err != nil {
 		return nil, err

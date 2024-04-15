@@ -2,6 +2,8 @@ package authorization
 
 import (
 	"context"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"milestone_core/awsinternal"
 	"net/http"
 	"strings"
@@ -10,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 )
 
-func CognitoMiddleware(userPoolID, region string) func(http.Handler) http.Handler {
+func CognitoMiddleware(workspaceCollection *mongo.Collection, region string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/health") {
@@ -51,7 +53,36 @@ func CognitoMiddleware(userPoolID, region string) func(http.Handler) http.Handle
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), "workspace", *user.Username)
+			userEmailIdentifier := ""
+			for _, attr := range user.UserAttributes {
+				if *attr.Name == "email" {
+					userEmailIdentifier = *attr.Value
+					break
+				}
+			}
+
+			workspaceID, err := GetWorkspaceIDByUserIdentifier(workspaceCollection, userEmailIdentifier)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			splitEmail := strings.Split(userEmailIdentifier, "@")
+
+			if workspaceID == "" {
+				workspaceCollection.InsertOne(context.Background(), bson.M{
+					"userIdentifiers": []string{userEmailIdentifier},
+					"name":            "My workspace",
+					"baseUrl":         "https://" + splitEmail[1],
+				})
+			}
+
+			ctx := context.WithValue(r.Context(), "user", UserData{
+				WorkspaceID: workspaceID,
+				UserID:      *user.Username,
+				Email:       userEmailIdentifier,
+			})
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
