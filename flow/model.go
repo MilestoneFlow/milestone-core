@@ -1,6 +1,8 @@
 package flow
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type Step struct {
 	StepID       string   `json:"stepId" bson:"stepId"`
@@ -17,6 +19,7 @@ type StepData struct {
 	Blocks             []StepBlock     `json:"blocks" bson:"blocks,omitempty"`
 	Transition         StepTransition  `json:"transition" bson:"transition,omitempty"`
 	ActionType         StepActionType  `json:"actionType" bson:"actionType,omitempty"`
+	ActionText         string          `json:"actionText" bson:"actionText,omitempty"`
 }
 
 type StepOpts struct {
@@ -92,8 +95,8 @@ type TargetingRule struct {
 }
 
 type FinishEffect struct {
-	Type FinishEffectType `json:"type,omitempty" bson:"type,omitempty"`
-	Data string           `json:"data,omitempty" bson:"data,omitempty"`
+	Type FinishEffectType       `json:"type,omitempty" bson:"type,omitempty"`
+	Data map[string]interface{} `json:"data,omitempty" bson:"data,omitempty"`
 }
 
 type FinishEffectType string
@@ -101,6 +104,24 @@ type FinishEffectType string
 const (
 	FinishEffectTypePopup               FinishEffectType = "popup"
 	FinishEffectTypeFullScreenAnimation FinishEffectType = "full_screen_animation"
+)
+
+type FinishEffectDataPopup struct {
+	Content string `json:"content" bson:"content"`
+}
+
+type FinishEffectDataFullScreenAnimation struct {
+	Name      string                      `json:"name" bson:"name"`
+	DurationS int                         `json:"durationS" bson:"durationS"`
+	Position  FullScreenAnimationPosition `json:"position" bson:"position"`
+	Url       string                      `json:"url" bson:"url"`
+}
+
+type FullScreenAnimationPosition string
+
+const (
+	FullScreenAnimationPositionBottomMiddle FullScreenAnimationPosition = "bottomMiddle"
+	FullScreenAnimationPositionMiddleScreen FullScreenAnimationPosition = "middleScreen"
 )
 
 type StepBlockType string
@@ -141,6 +162,7 @@ type StepActionType string
 const (
 	StepActionTypeNpAction StepActionType = "no_action"
 	StepActionTypeAction   StepActionType = "action"
+	StepActionTypeInput    StepActionType = "input"
 )
 
 type Branching struct {

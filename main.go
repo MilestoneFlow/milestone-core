@@ -9,6 +9,7 @@ import (
 	"milestone_core/apiclient"
 	"milestone_core/authorization"
 	"milestone_core/flow"
+	"milestone_core/helpers"
 	"milestone_core/progress"
 	"milestone_core/publicapi"
 	"milestone_core/template"
@@ -35,6 +36,7 @@ func main() {
 	apiClientsCollection := flowDbConnection.Collection("api_clients")
 	usersStateCollection := flowDbConnection.Collection("users_state")
 	workspaceCollection := flowDbConnection.Collection("workspaces")
+	helpersCollection := flowDbConnection.Collection("helpers")
 
 	log.Default().Print("a mers si colectii")
 
@@ -50,6 +52,7 @@ func main() {
 		EnrolledUserService: usersService,
 	}
 	workspaceService := workspace.Service{Collection: workspaceCollection}
+	helpersService := helpers.Service{Collection: helpersCollection}
 
 	r := chi.NewRouter()
 	corsMiddleware := cors.New(cors.Options{
@@ -80,6 +83,9 @@ func main() {
 	r.Mount("/flows", FlowsResource{
 		FlowService:     flowService,
 		ProgressService: progressService,
+	}.Routes())
+	r.Mount("/helpers", helpers.Resource{
+		Service: helpersService,
 	}.Routes())
 	r.Mount("/templates", TemplateResource{
 		TemplateService: templateService,

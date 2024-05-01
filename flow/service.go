@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"milestone_core/users"
+	"strings"
 )
 
 type Service struct {
@@ -218,6 +220,28 @@ func (s Service) Update(workspace string, id string, updateInput UpdateInput) er
 	}
 	if updateInput.FinishEffect != nil {
 		flow.Opts.FinishEffect = *updateInput.FinishEffect
+
+		if flow.Opts.FinishEffect.Type == FinishEffectTypeFullScreenAnimation {
+			baseUrL := "https://milestone-uploaded-flows-media.s3.amazonaws.com/assets/"
+			var effectData FinishEffectDataFullScreenAnimation
+			err = mapstructure.Decode(flow.Opts.FinishEffect.Data, &effectData)
+
+			flow.Opts.FinishEffect.Data["position"] = FullScreenAnimationPositionMiddleScreen
+			if effectData.Name == "fireworks_1" {
+				flow.Opts.FinishEffect.Data["url"] = baseUrL + "fireworks_1.gif"
+				flow.Opts.FinishEffect.Data["durationS"] = 4
+				flow.Opts.FinishEffect.Data["position"] = FullScreenAnimationPositionBottomMiddle
+			}
+			if effectData.Name == "confetti_1" {
+				flow.Opts.FinishEffect.Data["url"] = baseUrL + "confetti_1.gif"
+				flow.Opts.FinishEffect.Data["durationS"] = 2
+				flow.Opts.FinishEffect.Data["position"] = FullScreenAnimationPositionBottomMiddle
+			}
+			if effectData.Name == "congratulations_1" {
+				flow.Opts.FinishEffect.Data["url"] = baseUrL + "congratulations_1.gif"
+				flow.Opts.FinishEffect.Data["durationS"] = 5
+			}
+		}
 	}
 	if len(updateInput.Segments) == 0 {
 		flow.Opts.Segmentation = false
@@ -285,6 +309,24 @@ func (s Service) Capture(workspace string, id string, input UpdateInput) (string
 	}
 
 	return newId.InsertedID.(primitive.ObjectID).Hex(), nil
+}
+
+func (s Service) GetFlowPrerequisite(workspace string, flowId string) ([]string, error) {
+	flow, err := s.Get(workspace, flowId)
+	if err != nil {
+		return nil, err
+	}
+
+	triggerRules := flow.Opts.Trigger.Rules
+	prerequisite := make([]string, 0)
+	for _, rule := range triggerRules {
+		if rule.Condition == "prerequisite_flow_ids" && rule.Value != "" {
+			prereqFlowIds := strings.Split(rule.Value, ",")
+			prerequisite = prereqFlowIds
+		}
+	}
+
+	return prerequisite, nil
 }
 
 func (s Service) GetFlowAnalytics(workspace string, flowId string) (FlowAnalytics, error) {

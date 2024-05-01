@@ -64,11 +64,10 @@ func (s Service) GetUserState(token string, userId string) (*users.UserState, er
 	}
 
 	if lastUserState == nil || lastUserState.CurrentStepId == "" {
-		flowsIds, err := s.EnrolledUserService.GetFinishedFlowsForUser(apiClient.WorkspaceID, userId)
+		finishedFlowIds, err := s.EnrolledUserService.GetFinishedFlowsForUser(apiClient.WorkspaceID, userId)
 		if err != nil {
 			return nil, err
 		}
-		log.Default().Print(flowsIds)
 
 		flows, err := s.FlowService.ListLive(apiClient.WorkspaceID)
 		if err != nil {
@@ -77,8 +76,19 @@ func (s Service) GetUserState(token string, userId string) (*users.UserState, er
 		}
 
 		for _, inputFlow := range flows {
-			if slices.Contains(flowsIds, inputFlow.ID.Hex()) {
+			if slices.Contains(finishedFlowIds, inputFlow.ID.Hex()) {
 				continue
+			}
+
+			prerequisite, err := s.FlowService.GetFlowPrerequisite(apiClient.WorkspaceID, inputFlow.ID.Hex())
+			if err != nil {
+				return nil, err
+			}
+
+			for _, flowId := range prerequisite {
+				if !slices.Contains(finishedFlowIds, flowId) {
+					continue
+				}
 			}
 
 			source := inputFlow.Steps[0]

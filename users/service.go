@@ -70,7 +70,7 @@ func (s Service) GetLastUserState(workspace string, userId string) (*UserState, 
 	var userState UserState
 
 	opts := options.FindOne().SetSort(bson.D{{"created", -1}})
-	err := s.UserStateCollection.FindOne(context.Background(), bson.M{"userId": userId, "workspace": workspace}, opts).Decode(&userState)
+	err := s.UserStateCollection.FindOne(context.Background(), bson.M{"userId": userId, "workspaceId": workspace}, opts).Decode(&userState)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, nil
@@ -82,7 +82,7 @@ func (s Service) GetLastUserState(workspace string, userId string) (*UserState, 
 }
 
 func (s Service) GetFinishedFlowsForUser(workspace string, userId string) ([]string, error) {
-	results, err := s.UserStateCollection.Distinct(context.Background(), "currentEnrolledFlowId", bson.M{"userId": userId, "workspace": workspace})
+	results, err := s.UserStateCollection.Distinct(context.Background(), "currentEnrolledFlowId", bson.M{"userId": userId, "workspaceId": workspace})
 	if err != nil {
 		return nil, err
 	}
