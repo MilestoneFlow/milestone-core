@@ -116,6 +116,8 @@ func (s Service) createNewHelper(workspaceId string, override Helper) *Helper {
 					Order:   1,
 				},
 			},
+			ActionText: "Close",
+			IconColor:  "#f5f5f5",
 		},
 		RenderAction: HelperRenderActionClick,
 		Published:    false,
@@ -140,6 +142,12 @@ func (s Service) createNewHelper(workspaceId string, override Helper) *Helper {
 	}
 	if override.Data.Blocks != nil && len(override.Data.Blocks) > 0 {
 		helper.Data.Blocks = override.Data.Blocks
+	}
+	if override.Data.ActionText != "" {
+		helper.Data.ActionText = override.Data.ActionText
+	}
+	if override.Data.IconColor != "" {
+		helper.Data.IconColor = override.Data.IconColor
 	}
 	if override.RenderAction != "" {
 		helper.RenderAction = override.RenderAction

@@ -40,6 +40,10 @@ func (rs usersResource) List(w http.ResponseWriter, r *http.Request) {
 
 	usersOffset := min(rowsPerPage*(pageNumber-1), len(enrolledUsers))
 	usersMax := min(usersOffset+rowsPerPage, len(enrolledUsers))
+	if usersOffset < 0 {
+		usersOffset = 0
+		usersMax = 0
+	}
 	paginatedEnrolledUsers := enrolledUsers[usersOffset:usersMax]
 	var response = struct {
 		EnrolledUsers []*users.EnrolledUser `json:"enrolledUsers"`

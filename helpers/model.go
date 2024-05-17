@@ -21,6 +21,8 @@ type HelperData struct {
 	ElementType        HelperElementType `json:"elementType" bson:"elementType,omitempty"`
 	Placement          HelperPlacement   `json:"placement" bson:"placement,omitempty"`
 	Blocks             []HelperBlock     `json:"blocks" bson:"blocks,omitempty"`
+	ActionText         string            `json:"actionText" bson:"actionText,omitempty"`
+	IconColor          string            `json:"iconColor" bson:"iconColor,omitempty"`
 }
 
 type HelperBlockType string
