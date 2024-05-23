@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
 )
 
 func GetWorkspaceIDByUserIdentifier(workspaceCollection *mongo.Collection, userIdentifier string) (string, error) {
@@ -24,5 +25,21 @@ func GetWorkspaceIDByUserIdentifier(workspaceCollection *mongo.Collection, userI
 	}
 
 	workspaceIdStr := workspace["_id"].(primitive.ObjectID).Hex()
+	return workspaceIdStr, nil
+}
+
+func GetWorkspaceIDByPublicApiToken(apiClientsCollection *mongo.Collection, token string) (string, error) {
+	projection := bson.D{{"workspaceId", 1}}
+	opts := options.FindOne().SetProjection(projection)
+
+	var apiClient bson.M
+	err := apiClientsCollection.FindOne(context.Background(), bson.M{"token": token}, opts).Decode(&apiClient)
+
+	if err != nil {
+		log.Default().Print(err)
+		return "", errors.New("failed to get workspace for token")
+	}
+
+	workspaceIdStr := apiClient["workspaceId"].(string)
 	return workspaceIdStr, nil
 }

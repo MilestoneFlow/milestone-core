@@ -22,6 +22,18 @@ func GetWorkspaceIdFromContext(ctx context.Context) string {
 	return userData.WorkspaceID
 }
 
+func GetTokenFromPublicApiClientContext(ctx context.Context) string {
+	publicApiClientData := ctx.Value("client").(authorization.PublicApiClientData)
+
+	return publicApiClientData.Token
+}
+
+func GetWorkspaceIdFromPublicApiClientContext(ctx context.Context) string {
+	publicApiClientData := ctx.Value("client").(authorization.PublicApiClientData)
+
+	return publicApiClientData.WorkspaceID
+}
+
 func SendJson(writer http.ResponseWriter, data any) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {

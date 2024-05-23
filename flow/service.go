@@ -10,12 +10,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
-	"milestone_core/users"
 	"strings"
 )
 
 type Service struct {
-	Collection *mongo.Collection
+	Collection        *mongo.Collection
+	ArchiveCollection *mongo.Collection
 }
 
 func (s Service) Get(workspace string, id string) (*Flow, error) {
@@ -26,11 +26,38 @@ func (s Service) Get(workspace string, id string) (*Flow, error) {
 
 	var flow Flow
 	err = s.Collection.FindOne(context.Background(), bson.M{"_id": flowID, "workspaceId": workspace}).Decode(&flow)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	return &flow, nil
+}
+
+func (s Service) Archive(workspace string, id string) error {
+	flowID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	flow, err := s.Get(workspace, id)
+	if err != nil {
+		return err
+	}
+	if flow == nil {
+		return nil
+	}
+
+	_, err = s.ArchiveCollection.InsertOne(context.Background(), flow)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Collection.DeleteOne(context.Background(), bson.M{"_id": flowID})
+
+	return err
 }
 
 func (s Service) GetChildrenStep(workspace string, flowId string, parentStepId string, segmentId string) (*Step, error) {
@@ -353,54 +380,6 @@ func (s Service) GetFlowAnalytics(workspace string, flowId string) (FlowAnalytic
 		Views:        0,
 		AvgTotalTime: 0,
 		AvgStepTime:  make(map[string]int64),
-	}
-
-	result, err := s.Collection.Database().Collection("users_state").Find(context.Background(), bson.M{"currentEnrolledFlowId": flow.ID.Hex()})
-	if err != nil {
-		return analytics, err
-	}
-
-	statesArr := make([]*users.UserState, 0)
-	for result.Next(context.Background()) {
-		var statesObj users.UserState
-		err := result.Decode(&statesObj)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		statesArr = append(statesArr, &statesObj)
-	}
-
-	if len(statesArr) == 0 {
-		return analytics, nil
-	}
-
-	analytics.Views = len(statesArr)
-	noOfSteps := len(flow.Steps)
-	noOfValidStates := 0
-	totalFlowAvgTime := int64(0)
-	stepAvgTime := make(map[string]int64)
-	for _, state := range statesArr {
-		currentFlowAvgTime := int64(0)
-		if len(state.Times) == noOfSteps {
-			noOfValidStates += 1
-			for _, time := range state.Times {
-				stepAvgTime[time.StepId] += time.EndTimestamp - time.StartTimestamp
-				currentFlowAvgTime += time.EndTimestamp - time.StartTimestamp
-			}
-		}
-		totalFlowAvgTime += currentFlowAvgTime
-	}
-	totalFlowAvgTime = 0
-	if noOfValidStates > 0 {
-		totalFlowAvgTime = totalFlowAvgTime / int64(noOfValidStates)
-	}
-	analytics.AvgTotalTime = totalFlowAvgTime
-	for stepId, time := range stepAvgTime {
-		analytics.AvgStepTime[stepId] = 0
-		if noOfValidStates > 0 {
-			analytics.AvgStepTime[stepId] = time / int64(noOfValidStates)
-		}
 	}
 
 	return analytics, nil

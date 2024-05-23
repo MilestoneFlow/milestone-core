@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 )
 
-func CognitoMiddleware(workspaceCollection *mongo.Collection, region string) func(http.Handler) http.Handler {
+func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollection *mongo.Collection, region string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/health") {
@@ -33,7 +33,16 @@ func CognitoMiddleware(workspaceCollection *mongo.Collection, region string) fun
 			}
 
 			if strings.HasPrefix(r.URL.Path, "/public/") {
-				ctx := context.WithValue(r.Context(), "token", authToken)
+				workspaceID, err := GetWorkspaceIDByPublicApiToken(apiClientsCollection, authToken)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				ctx := context.WithValue(r.Context(), "client", PublicApiClientData{
+					WorkspaceID: workspaceID,
+					Token:       authToken,
+				})
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}

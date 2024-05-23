@@ -27,8 +27,31 @@ func (s Service) Get(publicId string, workspaceId string) (*Helper, error) {
 }
 
 func (s Service) List(workspaceId string) ([]Helper, error) {
+	findCondition := bson.M{"workspaceId": workspaceId}
+
 	var helpers []Helper
-	cursor, err := s.Collection.Find(context.Background(), bson.M{"workspaceId": workspaceId})
+	cursor, err := s.Collection.Find(context.Background(), findCondition)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cursor.All(context.Background(), &helpers)
+	if err != nil {
+		return nil, err
+	}
+
+	if helpers == nil {
+		helpers = []Helper{}
+	}
+
+	return helpers, nil
+}
+
+func (s Service) ListPublished(workspaceId string) ([]Helper, error) {
+	findCondition := bson.M{"workspaceId": workspaceId, "published": true}
+
+	var helpers []Helper
+	cursor, err := s.Collection.Find(context.Background(), findCondition)
 	if err != nil {
 		return nil, err
 	}

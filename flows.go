@@ -37,6 +37,7 @@ func (rs FlowsResource) Routes() chi.Router {
 		r.Post("/{stepId}/media", rs.UploadMediaFile)
 		r.Get("/", rs.Get)
 		r.Put("/", rs.Update)
+		r.Delete("/", rs.Archive)
 		r.Post("/continue", rs.MoveToNextStep)
 		r.Put("/{stepId}", rs.UpdateStep)
 		r.Post("/capture", rs.Capture)
@@ -240,4 +241,17 @@ func (rs FlowsResource) Unpublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	server.SendJson(w, "unpublished flow with id: "+idParam)
+}
+
+func (rs FlowsResource) Archive(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+
+	err := rs.FlowService.Archive(workspaceId, idParam)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, "archived flow with id: "+idParam)
 }

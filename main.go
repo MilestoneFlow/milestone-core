@@ -29,6 +29,8 @@ func main() {
 	log.Default().Print("a mers si db")
 
 	flowCollection := flowDbConnection.Collection("flows")
+	flowArchiveCollection := flowDbConnection.Collection("flows_archive")
+
 	progressCollection := flowDbConnection.Collection("flows_progress")
 	templateCollection := flowDbConnection.Collection("flows_templates")
 	usersCollection := flowDbConnection.Collection("enrolled_users")
@@ -37,22 +39,24 @@ func main() {
 	usersStateCollection := flowDbConnection.Collection("users_state")
 	workspaceCollection := flowDbConnection.Collection("workspaces")
 	helpersCollection := flowDbConnection.Collection("helpers")
+	trackerCollection := flowDbConnection.Collection("tracking_data")
 
 	log.Default().Print("a mers si colectii")
 
-	flowService := flow.Service{Collection: flowCollection}
+	flowService := flow.Service{Collection: flowCollection, ArchiveCollection: flowArchiveCollection}
 	progressService := progress.Service{Collection: progressCollection, FlowService: flowService}
 	templateService := template.Service{Collection: templateCollection, FlowCollection: flowCollection}
 	usersService := users.Service{Collection: usersCollection, UserStateCollection: usersStateCollection}
 	branchingService := flow.BranchingService{Collection: branchingCollection}
 	apiClientService := apiclient.Service{Collection: apiClientsCollection}
+	workspaceService := workspace.Service{Collection: workspaceCollection}
+	helpersService := helpers.Service{Collection: helpersCollection}
 	publicapiService := publicapi.Service{
 		ApiClientService:    apiClientService,
 		FlowService:         flowService,
 		EnrolledUserService: usersService,
+		HelpersService:      helpersService,
 	}
-	workspaceService := workspace.Service{Collection: workspaceCollection}
-	helpersService := helpers.Service{Collection: helpersCollection}
 
 	r := chi.NewRouter()
 	corsMiddleware := cors.New(cors.Options{
@@ -63,7 +67,7 @@ func main() {
 	})
 
 	r.Use(corsMiddleware.Handler)
-	r.Use(authorization.CognitoMiddleware(workspaceCollection, "us-east-1"))
+	r.Use(authorization.CognitoMiddleware(apiClientsCollection, workspaceCollection, "us-east-1"))
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -102,6 +106,12 @@ func main() {
 	}.Routes())
 	r.Mount("/public", PublicApiResource{
 		Service: publicapiService,
+		UserStateService: publicapi.UserStateService{
+			UserStateCollection: usersStateCollection,
+			ApiClientService:    apiClientService,
+			EnrolledUserService: usersService,
+		},
+		Tracker: publicapi.Tracker{Collection: trackerCollection},
 	}.Routes())
 
 	http.ListenAndServe(":3333", r)

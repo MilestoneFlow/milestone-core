@@ -94,14 +94,3 @@ func (s Service) GetFinishedFlowsForUser(workspace string, userId string) ([]str
 
 	return flowsIds, nil
 }
-
-func (s Service) CreateUserState(workspace string, userState UserState) (interface{}, error) {
-	userState.Created = time.Now().Unix()
-	userState.WorkspaceId = workspace
-	result, err := s.UserStateCollection.InsertOne(context.Background(), userState)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.InsertedID, nil
-}

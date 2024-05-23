@@ -5,3 +5,8 @@ type UserData struct {
 	UserID      string
 	Email       string
 }
+
+type PublicApiClientData struct {
+	WorkspaceID string
+	Token       string
+}

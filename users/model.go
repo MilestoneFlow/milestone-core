@@ -14,17 +14,16 @@ type EnrolledUser struct {
 }
 
 type UserState struct {
-	ID                    primitive.ObjectID `json:"-" bson:"_id,omitempty"`
-	WorkspaceId           string             `json:"-" bson:"workspaceId"`
-	UserId                string             `json:"userId" bson:"userId"`
-	CurrentEnrolledFlowId string             `json:"currentEnrolledFlowId" bson:"currentEnrolledFlowId"`
-	CurrentStepId         string             `json:"currentStepId" bson:"currentStepId"`
-	Times                 []UserStateTime    `json:"times" bson:"times"`
-	Created               int64              `json:"-" bson:"created"`
+	ID               primitive.ObjectID `json:"-,omitempty" bson:"_id,omitempty"`
+	WorkspaceID      string             `json:"workspaceId" bson:"workspaceId"`
+	UserID           string             `json:"userId" bson:"userId"`
+	FlowsData        FlowsData          `json:"flowsData" bson:"flowsData"`
+	Metadata         map[string]string  `json:"metadata" bson:"metadata"`
+	UpdatedTimestamp int64              `json:"updatedTimestamp" bson:"updatedTimestamp"`
 }
 
-type UserStateTime struct {
-	StepId         string `json:"stepId" bson:"stepId"`
-	StartTimestamp int64  `json:"startTimestamp" bson:"startTimestamp"`
-	EndTimestamp   int64  `json:"endTimestamp" bson:"endTimestamp"`
+type FlowsData struct {
+	CompletedFlowsIds []string `json:"completedFlowsIds" bson:"completedFlowsIds"`
+	SkippedFlowsIds   []string `json:"skippedFlowsIds" bson:"skippedFlowsIds"`
+	CurrentFlowID     string   `json:"currentFlowId" bson:"currentFlowId"`
 }

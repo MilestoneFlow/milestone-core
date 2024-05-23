@@ -10,24 +10,28 @@ import (
 )
 
 type PublicApiResource struct {
-	Service publicapi.Service
+	Service          publicapi.Service
+	Tracker          publicapi.Tracker
+	UserStateService publicapi.UserStateService
 }
 
 func (rs PublicApiResource) Routes() chi.Router {
 	r := chi.NewRouter()
 
-	r.Get("/{id}", rs.Get)
+	r.Get("/helpers", rs.GetHelpers)
+	r.Get("/flows/{id}", rs.Get)
+
 	r.Post("/enroll", rs.Enroll)
 	r.Get("/{externalUserId}/state", rs.GetUserState)
 	r.Post("/{externalUserId}/state", rs.UpdateUserState)
-	r.Post("/{externalUserId}/enroll", rs.EnrollInNextFlow)
+	r.Post("/track", rs.Track)
 
 	return r
 }
 
 func (rs PublicApiResource) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	token := r.Context().Value("token").(string)
+	token := server.GetTokenFromPublicApiClientContext(r.Context())
 	resFlow, err := rs.Service.GetFlow(token, id)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
@@ -38,7 +42,7 @@ func (rs PublicApiResource) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs PublicApiResource) Enroll(w http.ResponseWriter, r *http.Request) {
-	token := r.Context().Value("token").(string)
+	token := server.GetTokenFromPublicApiClientContext(r.Context())
 	var newUser users.EnrolledUser
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
@@ -57,8 +61,8 @@ func (rs PublicApiResource) Enroll(w http.ResponseWriter, r *http.Request) {
 
 func (rs PublicApiResource) GetUserState(w http.ResponseWriter, r *http.Request) {
 	externalUserId := chi.URLParam(r, "externalUserId")
-	token := r.Context().Value("token").(string)
-	userState, err := rs.Service.GetUserState(token, externalUserId)
+	token := server.GetTokenFromPublicApiClientContext(r.Context())
+	userState, err := rs.UserStateService.GetState(token, externalUserId)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -69,7 +73,7 @@ func (rs PublicApiResource) GetUserState(w http.ResponseWriter, r *http.Request)
 
 func (rs PublicApiResource) UpdateUserState(w http.ResponseWriter, r *http.Request) {
 	externalUserId := chi.URLParam(r, "externalUserId")
-	token := r.Context().Value("token").(string)
+	token := server.GetTokenFromPublicApiClientContext(r.Context())
 	var userState users.UserState
 	err := json.NewDecoder(r.Body).Decode(&userState)
 	if err != nil {
@@ -77,8 +81,7 @@ func (rs PublicApiResource) UpdateUserState(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	userState.UserId = externalUserId
-	err = rs.Service.UpdateUserState(token, userState)
+	err = rs.UserStateService.PutState(token, externalUserId, userState)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
@@ -87,14 +90,36 @@ func (rs PublicApiResource) UpdateUserState(w http.ResponseWriter, r *http.Reque
 	server.SendJson(w, "User state updated successfully")
 }
 
-func (rs PublicApiResource) EnrollInNextFlow(w http.ResponseWriter, r *http.Request) {
-	externalUserId := chi.URLParam(r, "externalUserId")
-	token := r.Context().Value("token").(string)
-	userState, err := rs.Service.EnrollInNextFlow(token, externalUserId)
+func (rs PublicApiResource) Track(w http.ResponseWriter, r *http.Request) {
+	var body TrackEventsRequest
+	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return
 	}
 
-	server.SendJson(w, userState)
+	workspaceId := server.GetWorkspaceIdFromPublicApiClientContext(r.Context())
+	err = rs.Tracker.TrackEvents(workspaceId, body.ExternalUserID, body.Events)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, "ok")
+}
+
+func (rs PublicApiResource) GetHelpers(w http.ResponseWriter, r *http.Request) {
+	token := server.GetTokenFromPublicApiClientContext(r.Context())
+	helpers, err := rs.Service.GetHelpers(token)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, helpers)
+}
+
+type TrackEventsRequest struct {
+	Events         []publicapi.EventTrack `json:"data"`
+	ExternalUserID string                 `json:"externalUserId"`
 }

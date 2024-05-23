@@ -4,6 +4,18 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type Flow struct {
+	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	WorkspaceID string             `json:"workspaceId" bson:"workspaceId"`
+	Name        string             `json:"name" bson:"name"`
+	BaseURL     string             `json:"baseUrl,omitempty" bson:"baseUrl,omitempty"`
+	Segments    []Segment          `json:"segments,omitempty" bson:"segments,omitempty"`
+	Steps       []Step             `json:"steps" bson:"steps"`
+	Relations   []Relation         `json:"relations" bson:"relations"`
+	Opts        Opts               `json:"opts,omitempty" bson:"opts,omitempty"`
+	Live        bool               `json:"live" bson:"live"`
+}
+
 type Step struct {
 	StepID       string   `json:"stepId" bson:"stepId"`
 	Data         StepData `json:"data" bson:"data"`
@@ -42,18 +54,6 @@ type Opts struct {
 	AvatarId        string              `json:"avatarId,omitempty" bson:"avatarId,omitempty"`
 	ElementTemplate StepElementTemplate `json:"elementTemplate" bson:"elementTemplate,omitempty"`
 	FinishEffect    FinishEffect        `json:"finishEffect,omitempty" bson:"finishEffect,omitempty"`
-}
-
-type Flow struct {
-	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	WorkspaceID string             `json:"workspaceId" bson:"workspaceId"`
-	Name        string             `json:"name" bson:"name"`
-	BaseURL     string             `json:"baseUrl,omitempty" bson:"baseUrl,omitempty"`
-	Segments    []Segment          `json:"segments,omitempty" bson:"segments,omitempty"`
-	Steps       []Step             `json:"steps" bson:"steps"`
-	Relations   []Relation         `json:"relations" bson:"relations"`
-	Opts        Opts               `json:"opts,omitempty" bson:"opts,omitempty"`
-	Live        bool               `json:"live" bson:"live"`
 }
 
 type Relation struct {
