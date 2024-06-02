@@ -2,9 +2,13 @@ package authorization
 
 import (
 	"context"
+	"errors"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"log"
 	"milestone_core/awsinternal"
+	"milestone_core/rest"
 	"net/http"
 	"strings"
 
@@ -14,6 +18,21 @@ import (
 
 func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollection *mongo.Collection, region string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
+		servePublicApiRequest := func(w http.ResponseWriter, r *http.Request, authToken string) {
+			workspaceID, err := GetWorkspaceIDByPublicApiToken(apiClientsCollection, authToken)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), "client", PublicApiClientData{
+				WorkspaceID: workspaceID,
+				Token:       authToken,
+			})
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/health") {
 				next.ServeHTTP(w, r)
@@ -33,23 +52,14 @@ func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollecti
 			}
 
 			if strings.HasPrefix(r.URL.Path, "/public/") {
-				workspaceID, err := GetWorkspaceIDByPublicApiToken(apiClientsCollection, authToken)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-
-				ctx := context.WithValue(r.Context(), "client", PublicApiClientData{
-					WorkspaceID: workspaceID,
-					Token:       authToken,
-				})
-				next.ServeHTTP(w, r.WithContext(ctx))
+				servePublicApiRequest(w, r, authToken)
 				return
 			}
 
 			cfg, err := awsinternal.GetConfiguration(region)
 			if err != nil {
-				http.Error(w, "failed to load AWS configuration", http.StatusInternalServerError)
+				log.Default().Print("authorizer: failed to load AWS configuration")
+				http.Error(w, "server error", http.StatusInternalServerError)
 				return
 			}
 
@@ -58,7 +68,8 @@ func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollecti
 				AccessToken: aws.String(authToken),
 			})
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
+				log.Default().Print(err)
+				rest.SendErrorResponse(w, errors.New("invalid token"), http.StatusUnauthorized)
 				return
 			}
 
@@ -76,14 +87,20 @@ func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollecti
 				return
 			}
 
-			splitEmail := strings.Split(userEmailIdentifier, "@")
-
 			if workspaceID == "" {
-				workspaceCollection.InsertOne(context.Background(), bson.M{
+				splitEmail := strings.Split(userEmailIdentifier, "@")
+				inserted, err := workspaceCollection.InsertOne(context.Background(), bson.M{
 					"userIdentifiers": []string{userEmailIdentifier},
 					"name":            "My workspace",
 					"baseUrl":         "https://" + splitEmail[1],
 				})
+				if err != nil {
+					log.Default().Print(err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				workspaceID = inserted.InsertedID.(primitive.ObjectID).Hex()
 			}
 
 			ctx := context.WithValue(r.Context(), "user", UserData{
@@ -95,12 +112,4 @@ func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollecti
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
-}
-
-func GetEmailDomain(email string) string {
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 || parts[1] == "" {
-		return ""
-	}
-	return parts[1]
 }

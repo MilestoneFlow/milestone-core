@@ -11,7 +11,6 @@ type Flow struct {
 	BaseURL     string             `json:"baseUrl,omitempty" bson:"baseUrl,omitempty"`
 	Segments    []Segment          `json:"segments,omitempty" bson:"segments,omitempty"`
 	Steps       []Step             `json:"steps" bson:"steps"`
-	Relations   []Relation         `json:"relations" bson:"relations"`
 	Opts        Opts               `json:"opts,omitempty" bson:"opts,omitempty"`
 	Live        bool               `json:"live" bson:"live"`
 }
@@ -54,6 +53,7 @@ type Opts struct {
 	AvatarId        string              `json:"avatarId,omitempty" bson:"avatarId,omitempty"`
 	ElementTemplate StepElementTemplate `json:"elementTemplate" bson:"elementTemplate,omitempty"`
 	FinishEffect    FinishEffect        `json:"finishEffect,omitempty" bson:"finishEffect,omitempty"`
+	DependsOn       []string            `json:"dependsOn,omitempty" bson:"dependsOn,omitempty"`
 }
 
 type Relation struct {
@@ -90,9 +90,16 @@ type Targeting struct {
 }
 
 type TargetingRule struct {
-	Condition string `json:"condition,omitempty" bson:"condition,omitempty"`
-	Value     string `json:"value,omitempty" bson:"value,omitempty"`
+	Condition TargetingRuleCondition `json:"condition,omitempty" bson:"condition,omitempty"`
+	Value     string                 `json:"value,omitempty" bson:"value,omitempty"`
 }
+
+type TargetingRuleCondition string
+
+const (
+	TargetingRuleUserElapsedTimeFromRegistration TargetingRuleCondition = "user_elapsed_time_from_enrollment"
+	TargetingRuleUserSegment                     TargetingRuleCondition = "user_segment"
+)
 
 type FinishEffect struct {
 	Type FinishEffectType       `json:"type,omitempty" bson:"type,omitempty"`

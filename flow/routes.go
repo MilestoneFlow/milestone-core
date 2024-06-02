@@ -1,4 +1,4 @@
-package main
+package flow
 
 import (
 	"context"
@@ -7,18 +7,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"milestone_core/awsinternal"
-	"milestone_core/flow"
-	"milestone_core/progress"
 	"milestone_core/server"
 	"net/http"
 	"path/filepath"
-	"time"
 )
 
 type FlowsResource struct {
-	FlowService     flow.Service
-	ProgressService progress.Service
-	Ctx             FlowCtx
+	FlowService Service
+	Ctx         FlowCtx
 }
 
 type FlowCtx struct {
@@ -38,12 +34,12 @@ func (rs FlowsResource) Routes() chi.Router {
 		r.Get("/", rs.Get)
 		r.Put("/", rs.Update)
 		r.Delete("/", rs.Archive)
-		r.Post("/continue", rs.MoveToNextStep)
 		r.Put("/{stepId}", rs.UpdateStep)
 		r.Post("/capture", rs.Capture)
 		r.Get("/analytics", rs.GetFlowAnalytics)
 		r.Post("/publish", rs.Publish)
 		r.Post("/unpublish", rs.Unpublish)
+		r.Get("/possible-depends-on-list", rs.GetPossibleDependsOnListForFlow)
 	})
 
 	return r
@@ -78,7 +74,7 @@ func (rs FlowsResource) Update(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	var updateInput flow.UpdateInput
+	var updateInput UpdateInput
 	err := json.NewDecoder(r.Body).Decode(&updateInput)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
@@ -94,20 +90,6 @@ func (rs FlowsResource) Update(w http.ResponseWriter, r *http.Request) {
 	server.SendJson(w, "updated flow with id: "+idParam)
 }
 
-func (rs FlowsResource) MoveToNextStep(w http.ResponseWriter, r *http.Request) {
-	idParam := chi.URLParam(r, "id")
-	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
-
-	step, err := rs.ProgressService.MoveToNextStep(workspaceId, idParam, "1", int32(time.Now().Unix()))
-	if err != nil {
-		server.SendBadRequestErrorJson(w, err)
-		return
-	}
-
-	server.SendJson(w, step)
-	return
-}
-
 func (rs FlowsResource) UpdateStep(w http.ResponseWriter, r *http.Request) {
 	flowId := chi.URLParam(r, "id")
 	stepId := chi.URLParam(r, "stepId")
@@ -119,7 +101,7 @@ func (rs FlowsResource) UpdateStep(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var updateInput flow.Step
+	var updateInput Step
 	err = json.NewDecoder(r.Body).Decode(&updateInput)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
@@ -139,7 +121,7 @@ func (rs FlowsResource) Capture(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	var updateInput flow.UpdateInput
+	var updateInput UpdateInput
 	err := json.NewDecoder(r.Body).Decode(&updateInput)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
@@ -254,4 +236,17 @@ func (rs FlowsResource) Archive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	server.SendJson(w, "archived flow with id: "+idParam)
+}
+
+func (rs FlowsResource) GetPossibleDependsOnListForFlow(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+
+	possibleDependsOnList, err := rs.FlowService.GetPossibleDependsOnListForFlow(workspaceId, idParam)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, possibleDependsOnList)
 }

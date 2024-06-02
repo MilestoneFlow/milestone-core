@@ -18,6 +18,10 @@ func (rs usersResource) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", rs.List)
 
+	r.Route("/{id}", func(r chi.Router) {
+		r.Post("/reset", rs.ResetState)
+	})
+
 	return r
 }
 
@@ -56,4 +60,25 @@ func (rs usersResource) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	server.SendJson(w, response)
+}
+
+func (rs usersResource) ResetState(w http.ResponseWriter, r *http.Request) {
+	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
+	userId := chi.URLParam(r, "id")
+
+	err := rs.usersService.PutState(workspaceId, userId, users.UserState{
+		FlowsData: users.FlowsData{
+			CompletedFlowsIds:          nil,
+			SkippedFlowsIds:            nil,
+			CurrentFlowID:              "",
+			LastSubmittedFlowID:        "",
+			LastSubmittedFlowTimestamp: 0,
+		},
+	})
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, nil)
 }

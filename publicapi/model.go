@@ -21,4 +21,5 @@ const (
 	EventTypeFlowStepStart  EventType = "flow_step_start"
 	EventTypeFlowStepFinish EventType = "flow_step_finish"
 	EventTypeFlowSkipped    EventType = "flow_skipped"
+	EventTypeFlowFinished   EventType = "flow_finished"
 )

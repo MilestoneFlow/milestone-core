@@ -2,7 +2,6 @@ package flow
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -216,8 +215,6 @@ func (s Service) Update(workspace string, id string, updateInput UpdateInput) er
 		s.updateStepData(flow, &updatedStep)
 	}
 
-	s.updateStepsRelations(flow)
-
 	for _, updatedSegment := range updateInput.Segments {
 		if len(updatedSegment.Name) > 0 {
 			found := false
@@ -288,9 +285,6 @@ func (s Service) Update(workspace string, id string, updateInput UpdateInput) er
 		}
 	}
 
-	flowIndented, _ := json.MarshalIndent(flow, "", "\t")
-	log.Default().Print(string(flowIndented))
-
 	err = s.saveUpdatedFlow(flow)
 
 	return err
@@ -327,8 +321,6 @@ func (s Service) Capture(workspace string, id string, input UpdateInput) (string
 			FinishEffect:    FinishEffect{},
 		},
 	}
-
-	s.updateStepsRelations(&flow)
 
 	newId, err := s.Collection.InsertOne(context.Background(), flow)
 	if err != nil {
@@ -385,6 +377,42 @@ func (s Service) GetFlowAnalytics(workspace string, flowId string) (FlowAnalytic
 	return analytics, nil
 }
 
+func (s Service) GetPossibleDependsOnListForFlow(workspace string, flowId string) ([]EssentialFlowInfo, error) {
+	flows, err := s.List(workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	isFlowInDependsOnList := func(flow Flow) bool {
+		for _, dependsOnId := range flow.Opts.DependsOn {
+			if dependsOnId == flowId {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	dependsOnList := make([]EssentialFlowInfo, 0)
+	for _, f := range flows {
+		if f.ID.Hex() != flowId && !isFlowInDependsOnList(*f) {
+			dependsOnList = append(dependsOnList, EssentialFlowInfo{
+				ID:   f.ID.Hex(),
+				Name: f.Name,
+				Live: f.Live,
+			})
+		}
+	}
+
+	return dependsOnList, nil
+}
+
+type EssentialFlowInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Live bool   `json:"live"`
+}
+
 func (s Service) updateStepData(flow *Flow, updatedStep *Step) {
 	for i := range flow.Steps {
 		if flow.Steps[i].StepID == updatedStep.StepID {
@@ -427,44 +455,4 @@ func (s Service) saveUpdatedFlow(flow *Flow) error {
 	_, err := s.Collection.UpdateByID(context.Background(), flow.ID, bson.M{"$set": flow})
 
 	return err
-}
-
-func (s Service) updateStepsRelations(flow *Flow) {
-	adjList := make(map[string][]*Step)
-	var sourceStep *Step
-
-	for i := range flow.Steps {
-		if 0 == len(flow.Steps[i].ParentNodeId) {
-			flow.Steps[i].Opts.IsSource = true
-			sourceStep = &flow.Steps[i]
-			continue
-		} else {
-			flow.Steps[i].Opts.IsSource = false
-		}
-		adjList[flow.Steps[i].ParentNodeId] = append(adjList[flow.Steps[i].ParentNodeId], &flow.Steps[i])
-	}
-
-	relations := make([]Relation, 0, len(flow.Steps)-1)
-
-	q := make([]*Step, 0)
-	q = append(q, sourceStep)
-	for len(q) > 0 {
-		node := q[0]
-		q = q[1:]
-		if children, ok := adjList[node.StepID]; ok {
-			node.Opts.IsFinal = false
-			for _, child := range children {
-				q = append(q, child)
-				relations = append(relations, Relation{From: node.StepID, To: child.StepID})
-
-				if len(node.Opts.SegmentID) > 0 && len(child.Opts.SegmentID) == 0 {
-					child.Opts.SegmentID = node.Opts.SegmentID
-				}
-			}
-		} else {
-			node.Opts.IsFinal = true
-		}
-	}
-
-	flow.Relations = relations
 }

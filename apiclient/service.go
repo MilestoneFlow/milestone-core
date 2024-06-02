@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -60,7 +61,8 @@ func (s Service) Create(workspace string) (string, error) {
 }
 
 func (s Service) Delete(workspace string, id string) error {
-	_, err := s.Collection.DeleteOne(context.Background(), bson.M{"_id": id, "workspaceId": workspace})
+	primitiveId, err := primitive.ObjectIDFromHex(id)
+	_, err = s.Collection.DeleteOne(context.Background(), bson.M{"_id": primitiveId, "workspaceId": workspace})
 	return err
 }
 

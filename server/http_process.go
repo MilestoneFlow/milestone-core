@@ -42,7 +42,6 @@ func SendJson(writer http.ResponseWriter, data any) {
 	}
 
 	writer.Header().Set("Content-Type", "application/json")
-	writer.Header().Set("Content-Type", "application/json")
 	_, err = writer.Write(jsonData)
 	if err != nil {
 		log.Fatal(err)
@@ -59,7 +58,6 @@ func SendMessageJson(writer http.ResponseWriter, message string) {
 		return
 	}
 
-	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("Content-Type", "application/json")
 	_, err = writer.Write(jsonData)
 	if err != nil {

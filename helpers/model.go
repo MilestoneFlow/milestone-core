@@ -37,10 +37,11 @@ const (
 type HelperPlacement string
 
 const (
-	HelperPlacementBottom HelperPlacement = "bottom"
-	HelperPlacementTop    HelperPlacement = "top"
-	HelperPlacementLeft   HelperPlacement = "left"
-	HelperPlacementRight  HelperPlacement = "right"
+	HelperPlacementBottom   HelperPlacement = "bottom"
+	HelperPlacementTop      HelperPlacement = "top"
+	HelperPlacementLeft     HelperPlacement = "left"
+	HelperPlacementRight    HelperPlacement = "right"
+	HelperPlacementTopStart HelperPlacement = "top-start"
 )
 
 type HelperElementType string

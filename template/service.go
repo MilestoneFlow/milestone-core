@@ -92,8 +92,6 @@ func (s Service) CreateFromTemplate(workspace string, id string, override flow.F
 				},
 			})
 		}
-
-		s.updateStepsRelations(flowTemplate)
 	}
 
 	flowTemplate.ID = primitive.NilObjectID
@@ -104,42 +102,4 @@ func (s Service) CreateFromTemplate(workspace string, id string, override flow.F
 	}
 
 	return result.InsertedID, nil
-}
-
-func (s Service) updateStepsRelations(template *flow.Flow) {
-	adjList := make(map[string][]*flow.Step)
-	var sourceStep *flow.Step
-
-	for i := range template.Steps {
-		if 0 == len(template.Steps[i].ParentNodeId) {
-			template.Steps[i].Opts.IsSource = true
-			sourceStep = &template.Steps[i]
-			continue
-		}
-		adjList[template.Steps[i].ParentNodeId] = append(adjList[template.Steps[i].ParentNodeId], &template.Steps[i])
-	}
-
-	relations := make([]flow.Relation, 0, len(template.Steps)-1)
-
-	q := make([]*flow.Step, 0)
-	q = append(q, sourceStep)
-	for len(q) > 0 {
-		node := q[0]
-		q = q[1:]
-		if children, ok := adjList[node.StepID]; ok {
-			node.Opts.IsFinal = false
-			for _, child := range children {
-				q = append(q, child)
-				relations = append(relations, flow.Relation{From: node.StepID, To: child.StepID})
-
-				if len(node.Opts.SegmentID) > 0 {
-					child.Opts.SegmentID = node.Opts.SegmentID
-				}
-			}
-		} else {
-			node.Opts.IsFinal = true
-		}
-	}
-
-	template.Relations = relations
 }

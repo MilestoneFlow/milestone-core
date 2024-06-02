@@ -23,7 +23,9 @@ type UserState struct {
 }
 
 type FlowsData struct {
-	CompletedFlowsIds []string `json:"completedFlowsIds" bson:"completedFlowsIds"`
-	SkippedFlowsIds   []string `json:"skippedFlowsIds" bson:"skippedFlowsIds"`
-	CurrentFlowID     string   `json:"currentFlowId" bson:"currentFlowId"`
+	CompletedFlowsIds          []string `json:"completedFlowsIds" bson:"completedFlowsIds"`
+	SkippedFlowsIds            []string `json:"skippedFlowsIds" bson:"skippedFlowsIds"`
+	CurrentFlowID              string   `json:"currentFlowId" bson:"currentFlowId"`
+	LastSubmittedFlowID        string   `json:"lastSubmittedFlowId" bson:"lastSubmittedFlowId"`
+	LastSubmittedFlowTimestamp int64    `json:"lastSubmittedFlowTimestamp" bson:"lastSubmittedFlowTimestamp"`
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"time"
 )
 
@@ -47,14 +47,23 @@ func (s Service) Get(workspace string, externalId string) (*EnrolledUser, error)
 	return &user, nil
 }
 
-func (s Service) Create(user EnrolledUser) (interface{}, error) {
+func (s Service) Create(user EnrolledUser) error {
 	user.Created = time.Now().Unix()
 	result, err := s.Collection.InsertOne(context.Background(), user)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return result.InsertedID, nil
+	enrolledUserId := result.InsertedID.(primitive.ObjectID).Hex()
+	_, err = s.UserStateCollection.InsertOne(context.Background(), UserState{
+		UserID:           enrolledUserId,
+		WorkspaceID:      user.WorkspaceId,
+		FlowsData:        FlowsData{},
+		Metadata:         map[string]string{},
+		UpdatedTimestamp: time.Now().Unix(),
+	})
+
+	return err
 }
 
 func (s Service) Delete(id string) error {
@@ -66,31 +75,27 @@ func (s Service) Delete(id string) error {
 	return nil
 }
 
-func (s Service) GetLastUserState(workspace string, userId string) (*UserState, error) {
+func (s Service) GetState(workspace string, userId string) (*UserState, error) {
 	var userState UserState
 
-	opts := options.FindOne().SetSort(bson.D{{"created", -1}})
-	err := s.UserStateCollection.FindOne(context.Background(), bson.M{"userId": userId, "workspaceId": workspace}, opts).Decode(&userState)
+	err := s.UserStateCollection.FindOne(context.Background(), bson.M{"userId": userId, "workspaceId": workspace}).Decode(&userState)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil
-		}
 		return nil, err
 	}
 
 	return &userState, nil
 }
 
-func (s Service) GetFinishedFlowsForUser(workspace string, userId string) ([]string, error) {
-	results, err := s.UserStateCollection.Distinct(context.Background(), "currentEnrolledFlowId", bson.M{"userId": userId, "workspaceId": workspace})
+func (s Service) PutState(workspace string, userId string, state UserState) error {
+	currentState, err := s.GetState(workspace, userId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	flowsIds := make([]string, 0)
-	for _, res := range results {
-		flowsIds = append(flowsIds, res.(string))
-	}
+	state.UpdatedTimestamp = time.Now().Unix()
+	state.WorkspaceID = currentState.WorkspaceID
+	state.UserID = currentState.UserID
+	_, err = s.UserStateCollection.UpdateOne(context.Background(), bson.M{"_id": currentState.ID}, bson.M{"$set": state})
 
-	return flowsIds, nil
+	return err
 }

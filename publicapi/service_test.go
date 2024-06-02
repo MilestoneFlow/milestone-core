@@ -14,31 +14,21 @@ import (
 
 func TestGroup(t *testing.T) {
 	mongoConnection := getFlowDbConnection()
-	mongoConnection.Collection("flows").Drop(context.Background())
-	mongoConnection.Collection("api_clients").Drop(context.Background())
-
-	mongoConnection.Collection("api_clients").InsertOne(context.Background(), apiclient.ApiClient{
-		Token:       "token",
-		WorkspaceID: "testWorkspaceId",
-	})
+	SetupMockData(&mongoConnection)
 
 	service := Service{
 		ApiClientService: apiclient.Service{
 			Collection: mongoConnection.Collection("api_clients"),
 		},
-		FlowService:         flow.Service{Collection: mongoConnection.Collection("flows")},
+		FlowEnroller:        flow.Enroller{Collection: mongoConnection.Collection("flows")},
 		EnrolledUserService: users.Service{Collection: mongoConnection.Collection("enrolled_users")},
 	}
 
 	t.Run("sanity test", func(t *testing.T) {
-		t.Cleanup(func() {
-			mongoConnection.Collection("flows").DeleteMany(context.Background(), primitive.M{})
-		})
-
 		newId := primitive.NewObjectID()
 		mongoConnection.Collection("flows").InsertOne(context.Background(), flow.Flow{
 			ID:          newId,
-			WorkspaceID: "testWorkspaceId",
+			WorkspaceID: WorkspaceID(),
 			Name:        "testName",
 			BaseURL:     "testBaseURL",
 			Segments:    []flow.Segment{},
@@ -59,9 +49,22 @@ func TestGroup(t *testing.T) {
 			t.Fatalf("Flow name is not the expected one")
 		}
 	})
-	t.Run("B", func(t *testing.T) {
-		t.Logf("Passed")
+
+	t.Run("sanity test", func(t *testing.T) {
+
+		resFlow, err := service.EnrollInFlow("token", "userId")
+		if err != nil {
+			t.Fatalf("Error: %s", err)
+		}
+		if resFlow == nil {
+			t.Fatalf("Flow is nil")
+		}
+		if resFlow.Name != "testName" {
+			t.Fatalf("Flow name is not the expected one")
+		}
 	})
+
+	CleanupMockData(&mongoConnection)
 }
 
 func getFlowDbConnection() mongo.Database {
