@@ -1,4 +1,4 @@
-package publicapi
+package tracker
 
 import (
 	"context"
@@ -23,4 +23,18 @@ func (t Tracker) TrackEvents(workspaceId string, externalUserId string, events [
 	}
 
 	return nil
+}
+
+func (t Tracker) FetchTrackDataForFlow(flowID string) ([]EventTrack, error) {
+	cursor, err := t.Collection.Find(context.Background(), map[string]string{"entityId": flowID})
+	if err != nil {
+		return nil, err
+	}
+
+	var events []EventTrack
+	if err = cursor.All(context.Background(), &events); err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }

@@ -1,4 +1,4 @@
-package publicapi
+package tracker
 
 import "go.mongodb.org/mongo-driver/bson/primitive"
 
@@ -19,7 +19,7 @@ const (
 	EventTypeHelperHover    EventType = "helper_hover"
 	EventTypeHelperClose    EventType = "helper_close"
 	EventTypeFlowStepStart  EventType = "flow_step_start"
-	EventTypeFlowStepFinish EventType = "flow_step_finish"
+	EventTypeFlowStepFinish EventType = "flow_step_finished"
 	EventTypeFlowSkipped    EventType = "flow_skipped"
 	EventTypeFlowFinished   EventType = "flow_finished"
 )

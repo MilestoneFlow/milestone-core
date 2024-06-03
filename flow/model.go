@@ -75,29 +75,27 @@ type StepBlock struct {
 }
 
 type Trigger struct {
-	TriggerID string        `json:"triggerId,omitempty" bson:"triggerId,omitempty"`
-	Rules     []TriggerRule `json:"rules,omitempty" bson:"rules,omitempty"`
+	Rules []TriggerRule `json:"rules,omitempty" bson:"rules,omitempty"`
 }
 
 type TriggerRule struct {
 	Condition string `json:"condition,omitempty" bson:"condition,omitempty"`
-	Value     string `json:"value,omitempty" bson:"value,omitempty"`
+	Value     any    `json:"value,omitempty" bson:"value,omitempty"`
 }
 
 type Targeting struct {
-	TargetingID string          `json:"targetingId,omitempty" bson:"targetingId,omitempty"`
-	Rules       []TargetingRule `json:"rules,omitempty" bson:"rules,omitempty"`
+	Rules []TargetingRule `json:"rules,omitempty" bson:"rules,omitempty"`
 }
 
 type TargetingRule struct {
 	Condition TargetingRuleCondition `json:"condition,omitempty" bson:"condition,omitempty"`
-	Value     string                 `json:"value,omitempty" bson:"value,omitempty"`
+	Value     any                    `json:"value,omitempty" bson:"value,omitempty"`
 }
 
 type TargetingRuleCondition string
 
 const (
-	TargetingRuleUserElapsedTimeFromRegistration TargetingRuleCondition = "user_elapsed_time_from_enrollment"
+	TargetingRuleUserElapsedDaysFromRegistration TargetingRuleCondition = "user_elapsed_time_from_enrollment_in_days"
 	TargetingRuleUserSegment                     TargetingRuleCondition = "user_segment"
 )
 
@@ -191,6 +189,8 @@ type BranchingVariant struct {
 type FlowAnalytics struct {
 	FlowID       string           `json:"flowId" bson:"flowId"`
 	Views        int              `json:"views" bson:"views"`
+	NoOfFinished int              `json:"noOfFinished" bson:"noOfFinished"`
+	NoOfSkipped  int              `json:"noOfSkipped" bson:"noOfSkipped"`
 	AvgTotalTime int64            `json:"avgTotalTime" bson:"avgTotalTime"`
 	AvgStepTime  map[string]int64 `json:"avgStepTime" bson:"avgStepTime"`
 }

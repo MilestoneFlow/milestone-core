@@ -33,7 +33,6 @@ func TestGroup(t *testing.T) {
 			BaseURL:     "testBaseURL",
 			Segments:    []flow.Segment{},
 			Steps:       []flow.Step{},
-			Relations:   []flow.Relation{},
 			Opts:        flow.Opts{},
 			Live:        true,
 		})

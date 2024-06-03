@@ -4,16 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/go-chi/chi/v5"
-	"log"
 	"milestone_core/publicapi"
 	"milestone_core/server"
+	"milestone_core/tracker"
 	"milestone_core/users"
 	"net/http"
 )
 
 type PublicApiResource struct {
 	Service          publicapi.Service
-	Tracker          publicapi.Tracker
+	Tracker          tracker.Tracker
 	UserStateService publicapi.UserStateService
 }
 
@@ -24,10 +24,15 @@ func (rs PublicApiResource) Routes() chi.Router {
 	r.Get("/helpers", rs.GetHelpers)
 	r.Get("/flows/{id}", rs.Get)
 
+	// Enroll user
 	r.Post("/enroll", rs.Enroll)
+
+	// User state
 	r.Get("/{externalUserId}/state", rs.GetUserState)
-	r.Post("/{externalUserId}/state", rs.UpdateUserState)
-	r.Post("/{externalUserId}/flows", rs.EnrollInFlow)
+	r.Post("/{externalUserId}/flows/enroll", rs.EnrollInFlow)
+	r.Post("/{externalUserId}/flows/state", rs.UpdateFlowState)
+
+	// Tracker
 	r.Post("/track", rs.Track)
 
 	return r
@@ -86,27 +91,8 @@ func (rs PublicApiResource) GetUserState(w http.ResponseWriter, r *http.Request)
 	server.SendJson(w, userState)
 }
 
-func (rs PublicApiResource) UpdateUserState(w http.ResponseWriter, r *http.Request) {
-	externalUserId := chi.URLParam(r, "externalUserId")
-	token := server.GetTokenFromPublicApiClientContext(r.Context())
-	var userState users.UserState
-	err := json.NewDecoder(r.Body).Decode(&userState)
-	if err != nil {
-		server.SendBadRequestErrorJson(w, err)
-		return
-	}
-
-	err = rs.UserStateService.PutState(token, externalUserId, userState)
-	if err != nil {
-		server.SendBadRequestErrorJson(w, err)
-		return
-	}
-
-	server.SendJson(w, "User state updated successfully")
-}
-
 func (rs PublicApiResource) Track(w http.ResponseWriter, r *http.Request) {
-	var body TrackEventsRequest
+	var body publicapi.TrackEventsRequest
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
@@ -121,11 +107,6 @@ func (rs PublicApiResource) Track(w http.ResponseWriter, r *http.Request) {
 	}
 
 	server.SendJson(w, "ok")
-
-	err = rs.Service.UpdateUserStateFromTrackEvents(workspaceId, body.ExternalUserID, body.Events)
-	if err != nil {
-		log.Print("Failed user state update: ", err)
-	}
 }
 
 func (rs PublicApiResource) GetHelpers(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +132,21 @@ func (rs PublicApiResource) EnrollInFlow(w http.ResponseWriter, r *http.Request)
 	server.SendJson(w, flow)
 }
 
-type TrackEventsRequest struct {
-	Events         []publicapi.EventTrack `json:"data"`
-	ExternalUserID string                 `json:"externalUserId"`
+func (rs PublicApiResource) UpdateFlowState(w http.ResponseWriter, r *http.Request) {
+	workspaceId := server.GetWorkspaceIdFromPublicApiClientContext(r.Context())
+	externalUserId := chi.URLParam(r, "externalUserId")
+	var body publicapi.FlowStateUpdateRequest
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	err = rs.Service.UpdateFlowState(workspaceId, externalUserId, body)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	server.SendJson(w, "ok")
 }

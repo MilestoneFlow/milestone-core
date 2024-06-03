@@ -159,7 +159,6 @@ func thirdGeneralFlowDependentOnStarterAndTargeted() flow.Flow {
 			ElementTemplate: flow.StepElementTemplateDark,
 			DependsOn:       []string{startFlow().ID.Hex()},
 			Targeting: flow.Targeting{
-				TargetingID: "targetingId",
 				Rules: []flow.TargetingRule{
 					{
 						Condition: "elapsed_time",

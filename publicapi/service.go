@@ -6,6 +6,7 @@ import (
 	"milestone_core/flow"
 	"milestone_core/helpers"
 	"milestone_core/users"
+	"time"
 )
 
 type Service struct {
@@ -58,6 +59,8 @@ func (s Service) EnrollInFlow(workspaceId string, externalUserId string) (*flow.
 		CurrentEnrollmentId: userState.FlowsData.CurrentFlowID,
 		FinishedIds:         userState.FlowsData.CompletedFlowsIds,
 		SkippedIds:          userState.FlowsData.SkippedFlowsIds,
+		SignUpTimestamp:     enrolledUser.SignUpTimestamp,
+		UserSegment:         enrolledUser.Segment,
 	})
 	if err != nil {
 		return nil, err
@@ -109,23 +112,23 @@ func (s Service) GetHelpers(token string) ([]helpers.Helper, error) {
 	return resHelpers, nil
 }
 
-func (s Service) UpdateUserStateFromTrackEvents(workspaceId string, externalUserId string, events []EventTrack) error {
+func (s Service) UpdateFlowState(workspaceId string, externalUserId string, payload FlowStateUpdateRequest) error {
 	skippedFlowId := ""
 	skippedTimestamp := int64(0)
 	finishedFlowId := ""
 	finishedTimestamp := int64(0)
-	for _, event := range events {
-		if event.EventType == EventTypeFlowSkipped {
-			skippedFlowId = event.EntityID
-			skippedTimestamp = event.Timestamp
-		}
-		if event.EventType == EventTypeFlowFinished {
-			finishedFlowId = event.EntityID
-			finishedTimestamp = event.Timestamp
-		}
+	currentTimestamp := time.Now().Unix()
+
+	if payload.Finished {
+		finishedFlowId = payload.FlowID
+		finishedTimestamp = currentTimestamp
+	}
+	if payload.Skipped {
+		skippedFlowId = payload.FlowID
+		skippedTimestamp = currentTimestamp
 	}
 
-	if skippedFlowId == "" && finishedFlowId == "" {
+	if skippedFlowId == "" && finishedFlowId == "" && payload.CurrentStepID == "" {
 		return nil
 	}
 
@@ -141,6 +144,8 @@ func (s Service) UpdateUserStateFromTrackEvents(workspaceId string, externalUser
 	if err != nil {
 		return err
 	}
+
+	currentState.FlowsData.CurrentStepID = payload.CurrentStepID
 
 	if skippedFlowId != "" {
 		currentState.FlowsData.SkippedFlowsIds = s.getUniqueValuesFromArr(append(currentState.FlowsData.SkippedFlowsIds, skippedFlowId))

@@ -12,6 +12,7 @@ import (
 	"milestone_core/helpers"
 	"milestone_core/publicapi"
 	"milestone_core/template"
+	"milestone_core/tracker"
 	"milestone_core/users"
 	"milestone_core/workspace"
 	"net/http"
@@ -53,6 +54,8 @@ func main() {
 		EnrolledUserService: usersService,
 		HelpersService:      helpersService,
 	}
+	trackerService := tracker.Tracker{Collection: trackerCollection}
+	flowAnalyticsService := flow.Analytics{Tracker: trackerService}
 
 	r := chi.NewRouter()
 	corsMiddleware := cors.New(cors.Options{
@@ -83,6 +86,7 @@ func main() {
 	r.Mount("/todos", todosResource{}.Routes())
 	r.Mount("/flows", flow.FlowsResource{
 		FlowService: flowService,
+		Analytics:   flowAnalyticsService,
 	}.Routes())
 	r.Mount("/helpers", helpers.Resource{
 		Service: helpersService,
@@ -107,7 +111,7 @@ func main() {
 			ApiClientService:    apiClientService,
 			EnrolledUserService: usersService,
 		},
-		Tracker: publicapi.Tracker{Collection: trackerCollection},
+		Tracker: trackerService,
 	}.Routes())
 
 	err := http.ListenAndServe(":3333", r)

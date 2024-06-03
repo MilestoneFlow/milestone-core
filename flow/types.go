@@ -10,8 +10,8 @@ type UpdateInput struct {
 	DeletedSteps []string               `json:"deletedSteps,omitempty"`
 	NewSteps     []Step                 `json:"newSteps,omitempty"`
 	Segments     []Segment              `json:"segments,omitempty"`
-	Trigger      Trigger                `json:"trigger,omitempty"`
-	Targeting    Targeting              `json:"targeting,omitempty"`
+	Trigger      *Trigger               `json:"trigger,omitempty"`
+	Targeting    *Targeting             `json:"targeting,omitempty"`
 	FinishEffect *FinishEffect          `json:"finishEffect,omitempty"`
 	MediaFiles   []multipart.FileHeader `json:"mediaFiles,omitempty"`
 }

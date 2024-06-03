@@ -14,6 +14,7 @@ import (
 
 type FlowsResource struct {
 	FlowService Service
+	Analytics   Analytics
 	Ctx         FlowCtx
 }
 
@@ -190,7 +191,13 @@ func (rs FlowsResource) GetFlowAnalytics(w http.ResponseWriter, r *http.Request)
 	idParam := chi.URLParam(r, "id")
 	workspaceId := server.GetWorkspaceIdFromContext(r.Context())
 
-	analytics, err := rs.FlowService.GetFlowAnalytics(workspaceId, idParam)
+	flow, err := rs.FlowService.Get(workspaceId, idParam)
+	if err != nil {
+		server.SendBadRequestErrorJson(w, err)
+		return
+	}
+
+	analytics, err := rs.Analytics.GetFlowAnalytics(flow)
 	if err != nil {
 		server.SendBadRequestErrorJson(w, err)
 		return

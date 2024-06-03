@@ -9,7 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
-	"strings"
 )
 
 type Service struct {
@@ -236,11 +235,11 @@ func (s Service) Update(workspace string, id string, updateInput UpdateInput) er
 		}
 	}
 
-	if updateInput.Trigger.TriggerID != "" {
-		flow.Opts.Trigger = updateInput.Trigger
+	if updateInput.Trigger != nil {
+		flow.Opts.Trigger = *updateInput.Trigger
 	}
-	if updateInput.Targeting.TargetingID != "" {
-		flow.Opts.Targeting = updateInput.Targeting
+	if updateInput.Targeting != nil {
+		flow.Opts.Targeting = *updateInput.Targeting
 	}
 	if updateInput.FinishEffect != nil {
 		flow.Opts.FinishEffect = *updateInput.FinishEffect
@@ -328,53 +327,6 @@ func (s Service) Capture(workspace string, id string, input UpdateInput) (string
 	}
 
 	return newId.InsertedID.(primitive.ObjectID).Hex(), nil
-}
-
-func (s Service) GetFlowPrerequisite(workspace string, flowId string) ([]string, error) {
-	flow, err := s.Get(workspace, flowId)
-	if err != nil {
-		return nil, err
-	}
-
-	triggerRules := flow.Opts.Trigger.Rules
-	prerequisite := make([]string, 0)
-	for _, rule := range triggerRules {
-		if rule.Condition == "prerequisite_flow_ids" && rule.Value != "" {
-			prereqFlowIds := strings.Split(rule.Value, ",")
-			prerequisite = prereqFlowIds
-		}
-	}
-
-	return prerequisite, nil
-}
-
-func (s Service) GetFlowAnalytics(workspace string, flowId string) (FlowAnalytics, error) {
-	flow, err := s.Get(workspace, flowId)
-	if err != nil {
-		return FlowAnalytics{
-			FlowID:       "",
-			Views:        0,
-			AvgTotalTime: 0,
-			AvgStepTime:  nil,
-		}, err
-	}
-	if flow == nil {
-		return FlowAnalytics{
-			FlowID:       "",
-			Views:        0,
-			AvgTotalTime: 0,
-			AvgStepTime:  nil,
-		}, nil
-	}
-
-	analytics := FlowAnalytics{
-		FlowID:       flow.ID.Hex(),
-		Views:        0,
-		AvgTotalTime: 0,
-		AvgStepTime:  make(map[string]int64),
-	}
-
-	return analytics, nil
 }
 
 func (s Service) GetPossibleDependsOnListForFlow(workspace string, flowId string) ([]EssentialFlowInfo, error) {
