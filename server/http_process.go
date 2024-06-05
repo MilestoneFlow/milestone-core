@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"milestone_core/authorization"
+	"milestone_core/identity/authorization"
 	"net/http"
 )
 

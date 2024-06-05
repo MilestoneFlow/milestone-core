@@ -6,15 +6,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
-	"milestone_core/apiclient"
-	"milestone_core/authorization"
-	"milestone_core/flow"
-	"milestone_core/helpers"
-	"milestone_core/publicapi"
-	"milestone_core/template"
-	"milestone_core/tracker"
-	"milestone_core/users"
-	"milestone_core/workspace"
+	"milestone_core/identity/apiclient"
+	"milestone_core/identity/authorization"
+	"milestone_core/identity/workspace"
+	"milestone_core/public/apigateway"
+	"milestone_core/public/enrolledusers"
+	"milestone_core/tours/branching"
+	"milestone_core/tours/flows"
+	"milestone_core/tours/helpers"
+	"milestone_core/tours/tracker"
 	"net/http"
 	"os"
 
@@ -29,7 +29,6 @@ func main() {
 	flowCollection := flowDbConnection.Collection("flows")
 	flowArchiveCollection := flowDbConnection.Collection("flows_archive")
 
-	templateCollection := flowDbConnection.Collection("flows_templates")
 	usersCollection := flowDbConnection.Collection("enrolled_users")
 	branchingCollection := flowDbConnection.Collection("branching")
 	apiClientsCollection := flowDbConnection.Collection("api_clients")
@@ -40,22 +39,21 @@ func main() {
 
 	log.Default().Print("collections initialized")
 
-	flowService := flow.Service{Collection: flowCollection, ArchiveCollection: flowArchiveCollection}
-	templateService := template.Service{Collection: templateCollection, FlowCollection: flowCollection}
-	usersService := users.Service{Collection: usersCollection, UserStateCollection: usersStateCollection}
-	branchingService := flow.BranchingService{Collection: branchingCollection}
+	flowService := flows.Service{Collection: flowCollection, ArchiveCollection: flowArchiveCollection}
+	usersService := enrolledusers.Service{Collection: usersCollection, UserStateCollection: usersStateCollection}
+	branchingService := flows.BranchingService{Collection: branchingCollection}
 	apiClientService := apiclient.Service{Collection: apiClientsCollection}
 	workspaceService := workspace.Service{Collection: workspaceCollection}
 	helpersService := helpers.Service{Collection: helpersCollection}
-	flowEnroller := flow.Enroller{Collection: flowCollection}
-	publicapiService := publicapi.Service{
+	flowEnroller := flows.Enroller{Collection: flowCollection}
+	publicapiService := apigateway.Service{
 		ApiClientService:    apiClientService,
 		FlowEnroller:        flowEnroller,
 		EnrolledUserService: usersService,
 		HelpersService:      helpersService,
 	}
 	trackerService := tracker.Tracker{Collection: trackerCollection}
-	flowAnalyticsService := flow.Analytics{Tracker: trackerService}
+	flowAnalyticsService := flows.Analytics{Tracker: trackerService}
 
 	r := chi.NewRouter()
 	corsMiddleware := cors.New(cors.Options{
@@ -82,31 +80,26 @@ func main() {
 		w.Write([]byte("."))
 	})
 
-	r.Mount("/enrolled-users", usersResource{usersService: usersService}.Routes())
-	r.Mount("/todos", todosResource{}.Routes())
-	r.Mount("/flows", flow.FlowsResource{
+	r.Mount("/enrolled-users", enrolledusers.UsersResource{UsersService: usersService}.Routes())
+	r.Mount("/flows", flows.FlowsResource{
 		FlowService: flowService,
 		Analytics:   flowAnalyticsService,
 	}.Routes())
 	r.Mount("/helpers", helpers.Resource{
 		Service: helpersService,
 	}.Routes())
-	r.Mount("/templates", TemplateResource{
-		TemplateService: templateService,
-	}.Routes())
-	r.Mount("/branching", BranchingResource{
+	r.Mount("/branching", branching.BranchingResource{
 		BranchingService: branchingService,
 	}.Routes())
 	r.Mount("/workspaces", workspace.Resource{
 		Service: workspaceService,
 	}.Routes())
-	r.Mount("/auth", AuthResource{}.Routes())
-	r.Mount("/apiclients", ApiClientResource{
+	r.Mount("/apiclients", apiclient.ApiClientResource{
 		Service: apiClientService,
 	}.Routes())
-	r.Mount("/public", PublicApiResource{
+	r.Mount("/public", apigateway.PublicApiResource{
 		Service: publicapiService,
-		UserStateService: publicapi.UserStateService{
+		UserStateService: apigateway.UserStateService{
 			UserStateCollection: usersStateCollection,
 			ApiClientService:    apiClientService,
 			EnrolledUserService: usersService,
