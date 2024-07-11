@@ -46,7 +46,7 @@ func TestGroup(t *testing.T) {
 	})
 
 	t.Run("Get workspace for existing user identified", func(t *testing.T) {
-		resWorkspace, err := service.GetByUserIdentifier("hello@email.com")
+		resWorkspace, err := service.GetByUserId("hello@email.com")
 
 		if err != nil {
 			t.Fatalf("Error: %s", err)
@@ -62,7 +62,7 @@ func TestGroup(t *testing.T) {
 	})
 
 	t.Run("User identifier is not in workspace, return nil", func(t *testing.T) {
-		resWorkspace, err := service.GetByUserIdentifier("nonexistent@email.com")
+		resWorkspace, err := service.GetByUserId("nonexistent@email.com")
 
 		if err != nil {
 			t.Fatalf("Error: %s", err)
@@ -75,12 +75,12 @@ func TestGroup(t *testing.T) {
 
 	t.Run("Add user identifier in workspace", func(t *testing.T) {
 		newUserIdentifiers := []string{"newuser@email.com", "newuser@emaile.com"}
-		err := service.AddUserIdentifiers(insertedWorkspaceID, newUserIdentifiers)
+		err := service.InviteUsers(insertedWorkspaceID, newUserIdentifiers)
 		if err != nil {
 			t.Fatalf("Error: %s", err)
 		}
 
-		resWorkspace, err := service.GetByUserIdentifier(newUserIdentifiers[1])
+		resWorkspace, err := service.GetByUserId(newUserIdentifiers[1])
 		if err != nil {
 			t.Fatalf("Error: %s", err)
 		}
@@ -96,14 +96,14 @@ func TestGroup(t *testing.T) {
 
 	t.Run("Remove user identifier from workspace", func(t *testing.T) {
 		userIdentifierToRemove := "test@email.com"
-		resWorkspace, err := service.GetByUserIdentifier(userIdentifierToRemove)
+		resWorkspace, err := service.GetByUserId(userIdentifierToRemove)
 		if resWorkspace == nil {
 			t.Fatalf("Workspace is nil")
 		}
 
-		err = service.RemoveUserIdentifier(insertedWorkspaceID, userIdentifierToRemove)
+		err = service.RemoveUser(insertedWorkspaceID, userIdentifierToRemove)
 
-		resWorkspace, err = service.GetByUserIdentifier(userIdentifierToRemove)
+		resWorkspace, err = service.GetByUserId(userIdentifierToRemove)
 		if err != nil {
 			t.Fatalf("Error: %s", err)
 		}

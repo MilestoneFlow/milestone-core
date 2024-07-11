@@ -6,8 +6,8 @@ import (
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"milestone_core/awsinternal"
-	"milestone_core/server"
+	"milestone_core/shared/awsinternal"
+	"milestone_core/shared/server"
 	"net/http"
 	"path/filepath"
 )

@@ -2,7 +2,7 @@ package apiclient
 
 import (
 	"github.com/go-chi/chi/v5"
-	"milestone_core/server"
+	"milestone_core/shared/server"
 	"net/http"
 )
 
@@ -10,7 +10,6 @@ type ApiClientResource struct {
 	Service Service
 }
 
-// Routes creates a REST router for the todos resource
 func (rs ApiClientResource) Routes() chi.Router {
 	r := chi.NewRouter()
 

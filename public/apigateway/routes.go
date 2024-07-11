@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"milestone_core/public/enrolledusers"
-	"milestone_core/server"
+	"milestone_core/shared/server"
 	"milestone_core/tours/tracker"
 	"net/http"
 )

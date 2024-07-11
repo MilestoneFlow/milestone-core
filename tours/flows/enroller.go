@@ -2,12 +2,10 @@ package flows
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
 	"time"
 )
 
@@ -29,9 +27,6 @@ func (s *Enroller) GetFlow(workspaceId string, opts EnrollmentOpts) (*Flow, erro
 	if err != nil {
 		return nil, err
 	}
-
-	jsonData, _ := json.Marshal(queryOpts)
-	log.Default().Print(string(jsonData))
 
 	var flow Flow
 	err = s.Collection.FindOne(context.Background(), queryOpts).Decode(&flow)
@@ -111,6 +106,7 @@ func (s *Enroller) withExcludedFlows(queryOpts bson.M, excludedIds []string) bso
 func (s *Enroller) withTargetingRules(queryOpts bson.M, opts EnrollmentOpts) bson.M {
 	audienceQuery := bson.M{"$and": []bson.M{}}
 	audienceQuery = s.withUserElapsedTimeRule(audienceQuery, opts.SignUpTimestamp)
+	audienceQuery = s.withUserRegisteredAfterTimestamp(audienceQuery, opts.SignUpTimestamp)
 	audienceQuery = s.withUserSegment(audienceQuery, opts.UserSegment)
 	userIdRuleNotExists := bson.M{
 		"opts.targeting.rules": bson.M{
@@ -159,6 +155,39 @@ func (s *Enroller) withUserElapsedTimeRule(queryOpts bson.M, signUpTimestamp int
 				"$elemMatch": bson.M{
 					"condition": TargetingRuleUserElapsedDaysFromRegistration,
 					"value":     bson.M{"$lte": elapsedDays},
+				},
+			},
+		}
+		clause = append(clause, conditionMatch)
+	}
+
+	queryOpts["$and"] = append(queryOpts["$and"].([]bson.M), bson.M{"$or": clause})
+
+	return queryOpts
+}
+
+func (s *Enroller) withUserRegisteredAfterTimestamp(queryOpts bson.M, signUpTimestamp int64) bson.M {
+	keyNotExist := bson.M{"opts.targeting.rules": bson.M{"$exists": false}}
+	emptyCondition := bson.M{"opts.targeting.rules": bson.M{"$size": 0}}
+
+	ruleNotExist := bson.M{
+		"opts.targeting.rules": bson.M{
+			"$not": bson.M{
+				"$elemMatch": bson.M{
+					"condition": UserRegisteredAfterTimestamp,
+				},
+			},
+		},
+	}
+
+	clause := []bson.M{keyNotExist, emptyCondition, ruleNotExist}
+
+	if signUpTimestamp != 0 {
+		conditionMatch := bson.M{
+			"opts.targeting.rules": bson.M{
+				"$elemMatch": bson.M{
+					"condition": UserRegisteredAfterTimestamp,
+					"value":     bson.M{"$lte": signUpTimestamp},
 				},
 			},
 		}

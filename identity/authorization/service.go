@@ -1,45 +1,72 @@
 package authorization
 
 import (
-	"context"
+	"database/sql"
 	"errors"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
+	"github.com/jmoiron/sqlx"
+	internalsql "milestone_core/shared/sql"
 )
 
-func GetWorkspaceIDByUserIdentifier(workspaceCollection *mongo.Collection, userIdentifier string) (string, error) {
-	projection := bson.D{{"_id", 1}}
-	opts := options.FindOne().SetProjection(projection)
+type WorkspaceBase struct {
+	ID      string `json:"id" db:"id"`
+	Default bool   `json:"default" db:"is_default"`
+}
 
-	var workspace bson.M
-	err := workspaceCollection.FindOne(context.Background(), bson.M{"userIdentifiers": bson.M{"$in": []string{userIdentifier}}}, opts).Decode(&workspace)
-
-	if errors.Is(err, mongo.ErrNoDocuments) {
+func GetWorkspaceIDByUserIdentifier(dbConnection *sqlx.DB, cognitoId string) (string, error) {
+	var workspace WorkspaceBase
+	err := dbConnection.Get(&workspace, "SELECT workspace_id as id, is_default FROM identity.workspace_user WHERE workspace_user.user_id = $1 AND workspace_user.is_default = true LIMIT 1", cognitoId)
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
 
-	workspaceIdStr := workspace["_id"].(primitive.ObjectID).Hex()
-	return workspaceIdStr, nil
+	return workspace.ID, nil
 }
 
-func GetWorkspaceIDByPublicApiToken(apiClientsCollection *mongo.Collection, token string) (string, error) {
-	projection := bson.D{{"workspaceId", 1}}
-	opts := options.FindOne().SetProjection(projection)
+//func GetWorkspaceIDByPublicApiToken(dbConnection *sqlx.DB, token string) (string, error) {
+//	var workspaceId string
+//	err := dbConnection.Get(&workspaceId, "SELECT workspace_id FROM identity.api_client WHERE identity.api_client.token = $1 LIMIT 1", token)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	return workspaceId, nil
+//}
 
-	var apiClient bson.M
-	err := apiClientsCollection.FindOne(context.Background(), bson.M{"token": token}, opts).Decode(&apiClient)
+func GetWorkspaceIDByPublicApiToken(dbConnection *sqlx.DB, token string) (*string, error) {
+	return internalsql.FetchOne[string](dbConnection, "SELECT workspace_id FROM identity.api_client WHERE identity.api_client.token = $1 LIMIT 1", token)
+}
 
+func UserHasAccessToWorkspace(dbConnection *sqlx.DB, cognitoId string, workspaceId string) (bool, error) {
+	var workspace WorkspaceBase
+	err := dbConnection.Get(&workspace, "SELECT workspace_id as id, is_default FROM identity.workspace_user WHERE workspace_user.user_id = $1 AND workspace_user.workspace_id = $2 LIMIT 1", cognitoId, workspaceId)
 	if err != nil {
-		log.Default().Print(err)
-		return "", errors.New("failed to get workspace for token")
+		return false, err
 	}
 
-	workspaceIdStr := apiClient["workspaceId"].(string)
-	return workspaceIdStr, nil
+	return true, nil
+}
+
+func CreateDefaultWorkspaceForUser(cognitoId string, dbConnection *sqlx.DB) (string, error) {
+	query := "INSERT INTO identity.platform_user (id) VALUES ($1)"
+	_, err := dbConnection.Queryx(query, cognitoId)
+	if err != nil {
+		return "", err
+	}
+
+	var workspaceId string
+	query = "INSERT INTO identity.workspace (name, base_url) VALUES ('Default Workspace', 'https://default.workspace') RETURNING id"
+	err = dbConnection.QueryRowx(query).Scan(&workspaceId)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = dbConnection.Exec("INSERT INTO identity.workspace_user (workspace_id, user_id, is_default, role) VALUES ($1, $2, true, 'admin')", workspaceId, cognitoId)
+	if err != nil {
+		return "", err
+	}
+
+	return workspaceId, nil
 }

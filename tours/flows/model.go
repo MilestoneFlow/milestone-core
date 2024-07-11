@@ -96,6 +96,7 @@ type TargetingRuleCondition string
 
 const (
 	TargetingRuleUserElapsedDaysFromRegistration TargetingRuleCondition = "user_elapsed_time_from_enrollment_in_days"
+	UserRegisteredAfterTimestamp                 TargetingRuleCondition = "user_registered_after_timestamp"
 	TargetingRuleUserSegment                     TargetingRuleCondition = "user_segment"
 	TargetingRuleUserIds                         TargetingRuleCondition = "user_ids"
 )

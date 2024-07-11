@@ -1,10 +1,19 @@
 package users
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
-
 type User struct {
-	ID                 primitive.ObjectID `json:"-" bson:"_id,omitempty"`
-	CognitoID          string             `json:"cognitoId" bson:"cognitoId"`
-	WorkspacesEnrolled []string           `json:"workspacesEnrolled" bson:"workspacesEnrolled"`
-	Created            int64              `json:"created" bson:"created"`
+	ID        string      `json:"id" db:"id"`
+	CreatedAt string      `json:"createdAt" db:"created_at"`
+	Details   UserDetails `json:"details"`
+}
+
+type UserDetails struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+type InvitedUser struct {
+	WorkspaceID string `json:"workspaceId" db:"workspace_id"`
+	Email       string `json:"email" db:"email"`
+	Token       string `json:"-" db:"token"`
+	CreatedAt   string `json:"createdAt" db:"created_at"`
 }

@@ -115,6 +115,14 @@ func (s Analytics) getStepAvgTime(events []tracker.EventTrack) map[string]int64 
 		}
 	}
 
+	for i, v := range stepTimesPerUserId {
+		for j := range v {
+			if !finishStepSeen[i][j] {
+				stepTimesPerUserId[i][j] = 0
+			}
+		}
+	}
+
 	stepAvgTime := make(map[string]int64)
 	for stepId, times := range stepTimesPerUserId {
 		var total int64

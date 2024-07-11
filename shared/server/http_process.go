@@ -22,14 +22,20 @@ func GetWorkspaceIdFromContext(ctx context.Context) string {
 	return userData.WorkspaceID
 }
 
+func GetUserIdFromContext(ctx context.Context) string {
+	userData := ctx.Value("user").(authorization.UserData)
+
+	return userData.UserID
+}
+
 func GetTokenFromPublicApiClientContext(ctx context.Context) string {
-	publicApiClientData := ctx.Value("client").(authorization.PublicApiClientData)
+	publicApiClientData := ctx.Value("user").(authorization.UserData)
 
 	return publicApiClientData.Token
 }
 
 func GetWorkspaceIdFromPublicApiClientContext(ctx context.Context) string {
-	publicApiClientData := ctx.Value("client").(authorization.PublicApiClientData)
+	publicApiClientData := ctx.Value("user").(authorization.UserData)
 
 	return publicApiClientData.WorkspaceID
 }

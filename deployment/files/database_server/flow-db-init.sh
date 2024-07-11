@@ -15,7 +15,5 @@ db.createUser({
 });
 
 use flowDb
-db.createCollection("users", { capped: false });
-db.createCollection("customers", { capped: false });
 db.createCollection("flows", { capped: false });
 EOF

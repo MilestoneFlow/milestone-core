@@ -2,7 +2,7 @@ package enrolledusers
 
 import (
 	"math"
-	"milestone_core/server"
+	"milestone_core/shared/server"
 	"net/http"
 	"strconv"
 

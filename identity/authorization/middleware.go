@@ -3,12 +3,10 @@ package authorization
 import (
 	"context"
 	"errors"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"log"
-	"milestone_core/awsinternal"
-	"milestone_core/rest"
+	"milestone_core/shared/rest"
 	"net/http"
 	"strings"
 
@@ -16,17 +14,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 )
 
-func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollection *mongo.Collection, region string) func(http.Handler) http.Handler {
+func CognitoMiddleware(postgresConnection *sqlx.DB, cognitoClient *cognitoidentityprovider.Client) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		servePublicApiRequest := func(w http.ResponseWriter, r *http.Request, authToken string) {
-			workspaceID, err := GetWorkspaceIDByPublicApiToken(apiClientsCollection, authToken)
+			workspaceID, err := GetWorkspaceIDByPublicApiToken(postgresConnection, authToken)
+			if workspaceID == nil {
+				rest.SendErrorResponse(w, errors.New("invalid token"), http.StatusUnauthorized)
+				return
+			}
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Default().Print(err)
+				rest.SendErrorResponse(w, errors.New("server error"), http.StatusInternalServerError)
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), "client", PublicApiClientData{
-				WorkspaceID: workspaceID,
+			ctx := context.WithValue(r.Context(), "user", UserData{
+				WorkspaceID: *workspaceID,
 				Token:       authToken,
 			})
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -51,20 +54,12 @@ func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollecti
 				return
 			}
 
-			if strings.HasPrefix(r.URL.Path, "/public/") {
+			if strings.HasPrefix(r.URL.Path, "/public/") || strings.HasPrefix(r.URL.Path, "/api/v1/") {
 				servePublicApiRequest(w, r, authToken)
 				return
 			}
 
-			cfg, err := awsinternal.GetConfiguration(region)
-			if err != nil {
-				log.Default().Print("authorizer: failed to load AWS configuration")
-				http.Error(w, "server error", http.StatusInternalServerError)
-				return
-			}
-
-			client := cognitoidentityprovider.NewFromConfig(*cfg)
-			user, err := client.GetUser(context.TODO(), &cognitoidentityprovider.GetUserInput{
+			user, err := cognitoClient.GetUser(context.TODO(), &cognitoidentityprovider.GetUserInput{
 				AccessToken: aws.String(authToken),
 			})
 			if err != nil {
@@ -73,6 +68,7 @@ func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollecti
 				return
 			}
 
+			cognitoId := *user.Username
 			userEmailIdentifier := ""
 			for _, attr := range user.UserAttributes {
 				if *attr.Name == "email" {
@@ -81,26 +77,43 @@ func CognitoMiddleware(apiClientsCollection *mongo.Collection, workspaceCollecti
 				}
 			}
 
-			workspaceID, err := GetWorkspaceIDByUserIdentifier(workspaceCollection, userEmailIdentifier)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			if workspaceID == "" {
-				splitEmail := strings.Split(userEmailIdentifier, "@")
-				inserted, err := workspaceCollection.InsertOne(context.Background(), bson.M{
-					"userIdentifiers": []string{userEmailIdentifier},
-					"name":            "My workspace",
-					"baseUrl":         "https://" + splitEmail[1],
-				})
+			workspaceID := ""
+			headerWorkspaceId := r.Header.Get("Workspace-Id")
+			if headerWorkspaceId != "" {
+				_, err = uuid.Parse(headerWorkspaceId)
 				if err != nil {
-					log.Default().Print(err)
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					rest.SendErrorResponse(w, errors.New("invalid workspace id provided"), http.StatusBadRequest)
 					return
 				}
 
-				workspaceID = inserted.InsertedID.(primitive.ObjectID).Hex()
+				hasAccess, err := UserHasAccessToWorkspace(postgresConnection, cognitoId, headerWorkspaceId)
+				if err != nil {
+					log.Default().Print(err)
+					rest.SendErrorResponse(w, errors.New("error checking access to workspace"), http.StatusInternalServerError)
+					return
+				}
+				if !hasAccess {
+					rest.SendErrorResponse(w, errors.New("user does not have access to workspace"), http.StatusForbidden)
+					return
+				}
+
+				workspaceID = headerWorkspaceId
+			} else {
+				workspaceID, err = GetWorkspaceIDByUserIdentifier(postgresConnection, cognitoId)
+				if err != nil {
+					log.Default().Print(err)
+					rest.SendErrorResponse(w, errors.New("error checking access to workspace"), http.StatusInternalServerError)
+					return
+				}
+			}
+
+			if workspaceID == "" {
+				workspaceID, err = CreateDefaultWorkspaceForUser(cognitoId, postgresConnection)
+				if err != nil {
+					log.Default().Print(err)
+					rest.SendErrorResponse(w, errors.New("error checking access to workspace"), http.StatusInternalServerError)
+					return
+				}
 			}
 
 			ctx := context.WithValue(r.Context(), "user", UserData{

@@ -1,20 +1,22 @@
 package apiclient
 
 import (
-	"context"
 	"crypto/rand"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"database/sql"
+	"errors"
+	"github.com/jmoiron/sqlx"
 )
 
 type Service struct {
-	Collection *mongo.Collection
+	DbConnection *sqlx.DB
 }
 
 func (s Service) Get(workspace string, id string) (*ApiClient, error) {
 	var apiClient ApiClient
-	err := s.Collection.FindOne(context.Background(), bson.M{"_id": id, "workspaceId": workspace}).Decode(&apiClient)
+	err := s.DbConnection.Get(&apiClient, "SELECT id, workspace_id, token FROM identity.api_client WHERE id = $1 AND workspace_id = $2", id, workspace)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +26,10 @@ func (s Service) Get(workspace string, id string) (*ApiClient, error) {
 
 func (s Service) GetByToken(token string) (*ApiClient, error) {
 	var apiClient ApiClient
-	err := s.Collection.FindOne(context.Background(), bson.M{"token": token}).Decode(&apiClient)
+	err := s.DbConnection.Get(&apiClient, "SELECT id, workspace_id, token FROM identity.api_client WHERE token = $1", token)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -34,14 +39,13 @@ func (s Service) GetByToken(token string) (*ApiClient, error) {
 
 func (s Service) List(workspace string) ([]ApiClient, error) {
 	var apiClients []ApiClient
-	cursor, err := s.Collection.Find(context.Background(), bson.M{"workspaceId": workspace})
+	err := s.DbConnection.Select(&apiClients, "SELECT id, workspace_id, token FROM identity.api_client WHERE workspace_id = $1", workspace)
 	if err != nil {
 		return nil, err
 	}
 
-	err = cursor.All(context.Background(), &apiClients)
-	if err != nil {
-		return nil, err
+	if apiClients == nil {
+		apiClients = make([]ApiClient, 0)
 	}
 
 	return apiClients, nil
@@ -53,16 +57,12 @@ func (s Service) Create(workspace string) (string, error) {
 		return "", err
 	}
 
-	_, err = s.Collection.InsertOne(context.Background(), ApiClient{
-		WorkspaceID: workspace,
-		Token:       token,
-	})
+	_, err = s.DbConnection.Exec("INSERT INTO identity.api_client (workspace_id, token) VALUES ($1, $2)", workspace, token)
 	return token, err
 }
 
 func (s Service) Delete(workspace string, id string) error {
-	primitiveId, err := primitive.ObjectIDFromHex(id)
-	_, err = s.Collection.DeleteOne(context.Background(), bson.M{"_id": primitiveId, "workspaceId": workspace})
+	_, err := s.DbConnection.Exec("DELETE FROM identity.api_client WHERE id = $1 AND workspace_id = $2", id, workspace)
 	return err
 }
 

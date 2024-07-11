@@ -3,7 +3,7 @@ package helpers
 import (
 	"encoding/json"
 	"github.com/go-chi/chi/v5"
-	"milestone_core/server"
+	"milestone_core/shared/server"
 	"net/http"
 )
 

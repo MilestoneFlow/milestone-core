@@ -2,7 +2,8 @@
 
 /.idea/
 /.env
+/.env.prod
 /db_data/
 /milestone_core
 
-MilestoneCoreStagingInstance.pem
+MilestoneCoreBackends.pem

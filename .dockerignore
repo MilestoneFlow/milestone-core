@@ -2,6 +2,6 @@ deployment/
 .git/
 *.log
 tmp/
-MilestoneCoreStagingInstance.pem
+MilestoneCoreBackends.pem
 milestone_core
 .env.example
